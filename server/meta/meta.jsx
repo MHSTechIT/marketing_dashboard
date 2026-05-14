@@ -180,6 +180,21 @@ async function getPageAccessToken(pageId) {
     return cached.token;
   }
 
+  // Check per-page env var: META_PAGE_TOKEN_<pageId> (e.g. META_PAGE_TOKEN_113830624877941)
+  const envPageToken = (process.env[`META_PAGE_TOKEN_${pageId}`] || '').trim();
+  if (envPageToken) {
+    pageTokenCache.tokens[pageId] = { token: envPageToken, expiresAt: now + pageTokenCache.ttl };
+    return envPageToken;
+  }
+
+  // Check META_PAGE_ACCESS_TOKEN when pageId matches META_PAGE_ID
+  const singlePageId = (process.env.META_PAGE_ID || '').trim();
+  const singlePageToken = (process.env.META_PAGE_ACCESS_TOKEN || '').trim();
+  if (singlePageToken && singlePageId === pageId) {
+    pageTokenCache.tokens[pageId] = { token: singlePageToken, expiresAt: now + pageTokenCache.ttl };
+    return singlePageToken;
+  }
+
   // Fetch from Meta API using System User Token
   try {
     const systemToken = getSystemToken();
