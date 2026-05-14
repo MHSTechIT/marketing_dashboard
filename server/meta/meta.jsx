@@ -2651,13 +2651,9 @@ router.get("/pages/:pageId/forms", optionalAuthMiddleware, async (req, res) => {
     }
   }
 
-  // All tokens exhausted
-  console.error(`[Forms] page=${pageId} all token attempts failed`);
-  res.status(403).json({
-    error: "Failed to fetch forms",
-    details: `Could not obtain a valid access token for page ${pageId}. Tried page token, user token, and system token.`,
-    instruction: "Ensure META_ACCESS_TOKEN is a valid user token with leads_retrieval permission, or the page is assigned to the System User.",
-  });
+  // All tokens exhausted — return empty forms so UI degrades gracefully
+  console.warn(`[Forms] page=${pageId} all token attempts failed — returning empty forms list`);
+  res.json({ data: [], warning: `No valid access token for page ${pageId}. Assign this page to your System User in Meta Business Manager.` });
 });
 
 // ---------------------------------------------------------------------
