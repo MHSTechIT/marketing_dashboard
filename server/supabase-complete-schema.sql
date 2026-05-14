@@ -61,6 +61,8 @@ CREATE TABLE IF NOT EXISTS public.leads (
   page_id TEXT,
   created_time TIMESTAMPTZ,
   ad_name TEXT,
+  sugar_poll TEXT,
+  lead_intel TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
