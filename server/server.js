@@ -46,6 +46,10 @@ app.use("/api/unique-leads", uniqueLeadsRoutes);
 const youtubeInsightsRoutes = require("./routes/youtubeInsights");
 app.use("/api/youtube", youtubeInsightsRoutes);
 
+// Leads → Google Sheets real-time sync (webhook + backfill)
+const leadsSyncRoutes = require("./routes/leadsSync");
+app.use("/api/leads-sync", leadsSyncRoutes);
+
 app.get("/", (req, res) => {
   res.send("Backend is running...");
 });

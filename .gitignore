@@ -81,6 +81,9 @@ temp/
 *.key
 *.cert
 
+# Google service account credentials (never commit private keys)
+server/credentials/
+
 
 .vercel
 .env*.local

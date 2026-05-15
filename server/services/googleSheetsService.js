@@ -57,17 +57,31 @@ async function getSheetsClient() {
   return _sheetsClient;
 }
 
+/** Convert 1-based column index to spreadsheet letter (1→A, 15→O, 26→Z, 27→AA). */
+function colLetter(n) {
+  let result = '';
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    result = String.fromCharCode(65 + rem) + result;
+    n = Math.floor((n - 1) / 26);
+  }
+  return result;
+}
+
 /**
  * Append rows to a sheet.
  * @param {string} spreadsheetId
- * @param {string} sheetName  e.g. "DW LEADS FROM MKT SW"
+ * @param {string} sheetName  e.g. "DW-live data"
  * @param {Array<Array<string>>} rows  2-D array of cell values
  */
 async function appendRows(spreadsheetId, sheetName, rows) {
   if (!rows || rows.length === 0) return;
   const sheets = await getSheetsClient();
 
-  // Find current last row so we can write to exact row ranges (avoids column-shift bug with append).
+  const numCols = rows[0].length;
+  const lastCol = colLetter(numCols);
+
+  // Find current last row so we can write to exact row ranges.
   const existing = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${sheetName}!A:A` });
   let startRow = ((existing.data.values || []).length) + 1;
 
@@ -77,7 +91,7 @@ async function appendRows(spreadsheetId, sheetName, rows) {
     const endRow = startRow + chunk.length - 1;
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `${sheetName}!A${startRow}:I${endRow}`,
+      range: `${sheetName}!A${startRow}:${lastCol}${endRow}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: chunk }
     });
@@ -88,7 +102,7 @@ async function appendRows(spreadsheetId, sheetName, rows) {
 /**
  * Read all values from a range (used to fetch existing lead IDs for dedup).
  * @param {string} spreadsheetId
- * @param {string} range  e.g. "DW LEADS FROM MKT SW!A:A"
+ * @param {string} range  e.g. "DW-live data!C:C"
  * @returns {Array<Array<string>>}
  */
 async function readRange(spreadsheetId, range) {
@@ -97,4 +111,4 @@ async function readRange(spreadsheetId, range) {
   return res.data.values || [];
 }
 
-module.exports = { appendRows, readRange };
+module.exports = { appendRows, readRange, colLetter };
