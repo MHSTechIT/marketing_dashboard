@@ -1258,13 +1258,17 @@ export default function AdsDashboardBootstrap() {
   // Match Meta dashboard behavior: Last 7 complete days, excluding today
   const getDefaultDates = () => {
     const today = new Date();
-    const endDate = new Date(today);
-    endDate.setDate(endDate.getDate() - 1); // Yesterday (exclude today, matching Meta)
-    const startDate = new Date(endDate);
-    startDate.setDate(startDate.getDate() - 6); // 7 days before yesterday (7 complete days)
+    const formatLocal = (d) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() - 6);
     return {
-      startDate: startDate.toISOString().slice(0, 10), // YYYY-MM-DD format
-      endDate: endDate.toISOString().slice(0, 10)
+      startDate: formatLocal(startDate),
+      endDate: formatLocal(today)
     };
   };
   
@@ -2144,23 +2148,39 @@ export default function AdsDashboardBootstrap() {
       });
       
       
+      // Build campaign_id → name lookup from campaigns state
+      const campaignIdToName = {};
+      campaigns.forEach(c => {
+        const cid = String(c.id || c.campaign_id || '');
+        if (cid) campaignIdToName[cid] = c.name || c.campaign_name || '';
+      });
+
       // Format leads for display (ensure all required fields are present)
-      const formattedLeads = leadsData.map(lead => ({
-        ...lead,
-        Name: lead.Name || lead.name || 'N/A',
-        Phone: lead.Phone || lead.phone || 'N/A',
-        Date: lead.Date || lead.DateChar || (lead.created_time ? lead.created_time.split('T')[0] : ''),
-        Time: lead.Time || lead.TimeUtc || lead.created_time || '',
-        TimeUtc: lead.TimeUtc || lead.created_time || '',
-        DateChar: lead.DateChar || (lead.created_time ? lead.created_time.split('T')[0] : ''),
-        Street: lead.Street || lead.street || lead.address || 'N/A',
-        City: lead.City || lead.city || 'N/A',
-        page_name: lead.page_name || 'N/A',
-        campaign_name: lead.campaign_name || lead.Campaign || 'N/A',
-        ad_name: lead.ad_name || 'N/A',
-        form_name: lead.form_name || 'N/A'
-      }));
-      
+      const formattedLeads = leadsData.map(lead => {
+        const cid = String(lead.campaign_id || '');
+        const resolvedCampaignName =
+          (lead.campaign_name && lead.campaign_name !== 'N/A' ? lead.campaign_name : null) ||
+          (lead.Campaign && lead.Campaign !== 'N/A' ? lead.Campaign : null) ||
+          (lead.campaign && lead.campaign !== 'N/A' ? lead.campaign : null) ||
+          campaignIdToName[cid] ||
+          'N/A';
+        return {
+          ...lead,
+          Name: lead.Name || lead.name || 'N/A',
+          Phone: lead.Phone || lead.phone || 'N/A',
+          Date: lead.Date || lead.DateChar || (lead.created_time ? lead.created_time.split('T')[0] : ''),
+          Time: lead.Time || lead.TimeUtc || lead.created_time || '',
+          TimeUtc: lead.TimeUtc || lead.created_time || '',
+          DateChar: lead.DateChar || (lead.created_time ? lead.created_time.split('T')[0] : ''),
+          Street: lead.Street || lead.street || lead.address || 'N/A',
+          City: lead.City || lead.city || 'N/A',
+          page_name: lead.page_name || 'N/A',
+          campaign_name: resolvedCampaignName,
+          ad_name: lead.ad_name || 'N/A',
+          form_name: lead.form_name || 'N/A'
+        };
+      });
+
       setLeads(formattedLeads);
       setLeadsContext(null);
       setPage(1);
@@ -2180,7 +2200,7 @@ export default function AdsDashboardBootstrap() {
     } finally {
       setLeadsLoading(false);
     }
-  }, [selectedCampaigns, selectedAds, dateFilters.startDate, dateFilters.endDate]);
+  }, [selectedCampaigns, selectedAds, dateFilters.startDate, dateFilters.endDate, campaigns]);
 
 
   // Auto-load leads when main dashboard filters change

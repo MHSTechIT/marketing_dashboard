@@ -463,6 +463,7 @@ function mapLeadRowToApi(row) {
     date_char: r.DateChar,
     Campaign: r.Campaign,
     campaign: r.Campaign,
+    campaign_name: r.Campaign ?? r.campaign ?? null,
     ad_id: r.ad_id,
     campaign_id: r.campaign_id,
     lead_id:
