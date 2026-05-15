@@ -1,0 +1,70 @@
+﻿services:
+  - type: web
+    name: mhs-marketing-dashboard
+    runtime: node
+    buildCommand: npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      # --- JWT ---
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 30d
+      # --- Meta / Facebook ---
+      - key: META_ACCESS_TOKEN
+        sync: false
+      - key: META_SYSTEM_ACCESS_TOKEN
+        sync: false
+      - key: META_SYSTEM_ACCESS_TOKEN_1
+        sync: false
+      - key: META_PAGE_ACCESS_TOKEN
+        sync: false
+      - key: META_AD_ACCOUNT_ID
+        sync: false
+      - key: META_APP_ID
+        sync: false
+      - key: META_APP_SECRET
+        sync: false
+      - key: META_PAGE_ID
+        sync: false
+      - key: META_PAGE_IDS
+        sync: false
+      - key: META_PAGE_NAMES
+        sync: false
+      # Per-page tokens (set in Render dashboard for each page)
+      - key: META_PAGE_TOKEN_113830624877941
+        sync: false
+      - key: META_PAGE_TOKEN_919735281228628
+        sync: false
+      - key: META_PAGE_TOKEN_355327027658692
+        sync: false
+      - key: META_PAGE_TOKEN_332255769969394
+        sync: false
+      # --- Supabase ---
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: LEADS_DB_SHAPE
+        value: snake
+      # --- AI ---
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GOOGLE_GEMINI_API_KEY
+        sync: false
+      # --- Google Sheets ---
+      - key: GOOGLE_SERVICE_ACCOUNT_EMAIL
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
+        sync: false
+      # --- Wix ---
+      - key: WIX_SITE_ID
+        sync: false
+      - key: WIX_TOKEN
+        sync: false

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "cd client && npm install && cross-env CI=false DISABLE_ESLINT_PLUGIN=true npm run build && cd ../server && npm install",
+    "start": "cd server && node server.js",
     "claude": "node ./claude.js"
   },
   "devDependencies": {

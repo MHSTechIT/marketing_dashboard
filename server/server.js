@@ -11,7 +11,8 @@ app.use(cors({
   origin: [
     'http://localhost:3000',
     'https://final-dashboard-gxau.vercel.app',
-    /https:\/\/.*\.vercel\.app$/
+    /https:\/\/.*\.vercel\.app$/,
+    /https:\/\/.*\.onrender\.com$/
   ],
   credentials: true
 }));
@@ -1173,6 +1174,15 @@ function startServer(retries = 3) {
       console.error('Server failed to start:', err.message);
       process.exit(1);
     }
+  });
+}
+
+// Serve React build in production (Render / any non-Vercel host)
+if (process.env.NODE_ENV === 'production') {
+  const clientBuild = path.join(__dirname, '..', 'client', 'build');
+  app.use(express.static(clientBuild));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(clientBuild, 'index.html'));
   });
 }
 
