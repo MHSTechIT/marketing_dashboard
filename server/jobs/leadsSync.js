@@ -27,42 +27,33 @@ function getSystemToken() {
  * @returns {Promise<string>} - The page access token
  */
 async function getPageAccessToken(pageId) {
-  const fromEnvPage = (process.env.META_PAGE_ACCESS_TOKEN || '').trim();
-  if (fromEnvPage) return fromEnvPage;
+  // 1. Per-page env var (most reliable for multi-page setups): META_PAGE_TOKEN_<pageId>
+  const perPageEnv = (process.env[`META_PAGE_TOKEN_${pageId}`] || '').trim();
+  if (perPageEnv) return perPageEnv;
 
-  // Prefer Graph: exchange a User (system) token for this page's Page Access Token.
+  // 2. Single-page env var when pageId matches META_PAGE_ID
+  const singlePageId = (process.env.META_PAGE_ID || '').trim();
+  const singlePageToken = (process.env.META_PAGE_ACCESS_TOKEN || '').trim();
+  if (singlePageToken && singlePageId === pageId) return singlePageToken;
+
+  // 3. Exchange system token via Graph API
   try {
     const systemToken = getSystemToken();
     const response = await axios.get(
       `https://graph.facebook.com/${META_API_VERSION}/${pageId}`,
-      {
-        params: {
-          fields: 'access_token',
-          access_token: systemToken,
-        },
-        timeout: 30000,
-      }
+      { params: { fields: 'access_token', access_token: systemToken }, timeout: 30000 }
     );
-    if (response.data?.access_token) {
-      return response.data.access_token;
-    }
+    if (response.data?.access_token) return response.data.access_token;
   } catch (error) {
-    const errorMsg = error.response?.data?.error?.message || error.message;
-    console.warn(`[LeadsSync] Could not fetch page token via Graph for page ${pageId}: ${errorMsg}`);
+    console.warn(`[LeadsSync] Could not fetch page token via Graph for page ${pageId}: ${error.response?.data?.error?.message || error.message}`);
   }
 
+  // 4. Fallback to user token
   const metaAccess = (process.env.META_ACCESS_TOKEN || '').trim();
-  if (metaAccess) {
-    console.warn(
-      '[LeadsSync] Using META_ACCESS_TOKEN for /leads batch; it must be a Page Access Token or Graph returns #190.'
-    );
-    return metaAccess;
-  }
+  if (metaAccess) return metaAccess;
 
   throw new Error(
-    `No page access token for page ${pageId}. Options: (1) Set META_PAGE_ACCESS_TOKEN to the page token, or ` +
-      `(2) use a User token in META_SYSTEM_ACCESS_TOKEN with access to this page so GET /${pageId}?fields=access_token works, or ` +
-      `(3) set META_ACCESS_TOKEN to a Page Access Token (Lead Ads require a page token, not a user token).`
+    `No page access token for page ${pageId}. Set META_PAGE_TOKEN_${pageId} in server/.env`
   );
 }
 
@@ -591,132 +582,128 @@ async function fetchLeadsFromMeta(pageId, startDate, endDate) {
 }
 
 /**
- * Sync leads job - fetches leads from Meta API and saves to database
+ * Resolve all page IDs to sync from env.
+ * Prefers META_PAGE_IDS (comma-separated list), falls back to META_PAGE_ID.
+ */
+function getPageIds() {
+  const multi = (process.env.META_PAGE_IDS || '').trim();
+  if (multi) return multi.split(',').map(s => s.trim()).filter(Boolean);
+  const single = (process.env.META_PAGE_ID || '').trim();
+  return single ? [single] : [];
+}
+
+/**
+ * Sync leads for a single page over a given date range.
+ * Returns true if DB save succeeded.
+ */
+async function syncPageLeads(pageId, startDate, endDate) {
+  console.log(`[LeadsSync] Syncing page ${pageId}: ${startDate.toISOString()} → ${endDate.toISOString()}`);
+  const leads = await fetchLeadsFromMeta(pageId, startDate, endDate);
+  if (leads.length === 0) {
+    console.log(`[LeadsSync] page=${pageId} no new leads in range`);
+    return true;
+  }
+  await saveLeads(leads);
+  console.log(`[LeadsSync] page=${pageId} saved ${leads.length} lead(s)`);
+  return true;
+}
+
+/**
+ * Sync leads job — fetches from ALL configured pages and saves to database.
+ *
+ * Fixes vs previous version:
+ *  1. Syncs all pages in META_PAGE_IDS, not just META_PAGE_ID.
+ *  2. The "reset" condition no longer fires on every 15-min run (old threshold
+ *     of 0.5 days was always true for a 15-min window).
+ *  3. On startup / after a gap, backfills up to BACKFILL_DAYS (default 7).
  */
 async function syncLeads() {
-  const pageId = process.env.META_PAGE_ID;
-  
-  if (!pageId) {
-    console.warn('[LeadsSync] META_PAGE_ID not configured, skipping sync');
+  const pageIds = getPageIds();
+  if (pageIds.length === 0) {
+    console.warn('[LeadsSync] No page IDs configured (set META_PAGE_IDS or META_PAGE_ID), skipping sync');
     return;
   }
 
   try {
-    
-    const endDate = new Date();
+    const now = new Date();
+    const OVERLAP_MS   = 10 * 60 * 1000;          // 10-min overlap to catch late-arriving leads
+    const BACKFILL_DAYS = 7;                        // max days to back-fill after a gap
+    const BACKFILL_MS   = BACKFILL_DAYS * 24 * 60 * 60 * 1000;
 
-    // Incremental sync: fetch since last successful run, with a small overlap to avoid missing late-arriving leads
-    const overlapMinutes = 10;
     const lastSyncValue = await getJobState(JOBSTATE_LAST_LEADS_SYNC_KEY);
     let startDate;
 
     if (lastSyncValue) {
       const parsed = new Date(lastSyncValue);
-      if (!isNaN(parsed.getTime())) {
-        // Check if stored timestamp is in the future (likely invalid)
-        if (parsed > endDate) {
-          console.warn(`[LeadsSync] ⚠️  Stored last sync timestamp (${parsed.toISOString()}) is in the future. Resetting JobState.`);
-          // Clear the invalid timestamp
-          await setJobState(JOBSTATE_LAST_LEADS_SYNC_KEY, '');
-          startDate = null; // Will trigger fallback below
-        } else {
-          startDate = parsed;
-          startDate = new Date(startDate.getTime() - overlapMinutes * 60 * 1000);
+      if (!isNaN(parsed.getTime()) && parsed <= now) {
+        // Normal incremental: from last sync minus overlap
+        startDate = new Date(parsed.getTime() - OVERLAP_MS);
+        // If the gap is larger than BACKFILL_DAYS, cap it to avoid huge API calls
+        const gapMs = now - startDate;
+        if (gapMs > BACKFILL_MS) {
+          console.warn(`[LeadsSync] Gap of ${(gapMs/86400000).toFixed(1)} days detected. Capping backfill to ${BACKFILL_DAYS} days.`);
+          startDate = new Date(now.getTime() - BACKFILL_MS);
         }
       } else {
-        console.warn(`[LeadsSync] ⚠️  Invalid last sync timestamp format: ${lastSyncValue}`);
+        // Stored timestamp is invalid or in the future — reset
+        console.warn(`[LeadsSync] ⚠️  Invalid/future JobState timestamp (${lastSyncValue}). Resetting to ${BACKFILL_DAYS}-day window.`);
+        await setJobState(JOBSTATE_LAST_LEADS_SYNC_KEY, '');
+        startDate = new Date(now.getTime() - BACKFILL_MS);
+      }
+    } else {
+      // First run: backfill the last BACKFILL_DAYS days
+      console.log(`[LeadsSync] No previous sync record. Backfilling last ${BACKFILL_DAYS} days.`);
+      startDate = new Date(now.getTime() - BACKFILL_MS);
+    }
+
+    const endDate = now;
+
+    // Sync each page in sequence (avoids hammering Meta rate limits)
+    let allSucceeded = true;
+    for (const pageId of pageIds) {
+      try {
+        await syncPageLeads(pageId, startDate, endDate);
+      } catch (err) {
+        console.error(`[LeadsSync] Error syncing page ${pageId}:`, err.message || err);
+        allSucceeded = false;
+        // Continue with remaining pages rather than aborting all
       }
     }
 
-    // First run fallback: last 24 hours
-    if (!startDate) {
-      startDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000);
+    // Only advance the cursor when all pages succeeded so a partial failure
+    // is retried on the next run.
+    if (allSucceeded) {
+      await setJobState(JOBSTATE_LAST_LEADS_SYNC_KEY, endDate.toISOString());
+    } else {
+      console.warn('[LeadsSync] One or more pages failed — JobState cursor NOT advanced. Will retry on next run.');
     }
-    
-    // Validate date range (warn if dates seem incorrect)
-    const now = new Date();
-    if (startDate > now || endDate > now) {
-      console.warn(`[LeadsSync] ⚠️  Date range includes future dates: startDate=${startDate.toISOString()}, endDate=${endDate.toISOString()}, now=${now.toISOString()}`);
-      console.warn(`[LeadsSync] This may cause no leads to be fetched. Check system time and JobState.`);
-    }
-    if (startDate >= endDate) {
-      console.warn(`[LeadsSync] ⚠️  Invalid date range: startDate (${startDate.toISOString()}) >= endDate (${endDate.toISOString()})`);
-    }
-    
-    // Detect and fix invalid date ranges
-    const hoursInRange = (endDate - startDate) / (1000 * 60 * 60);
-    const daysInRange = hoursInRange / 24;
-    const shouldResetJobState = startDate > now || (daysInRange < 0.5 && lastSyncValue); // Less than 12 hours and has JobState
-    
-    if (shouldResetJobState) {
-      console.warn(`[LeadsSync] ⚠️  Detected problematic date range - likely due to invalid JobState timestamp.`);
-      console.warn(`[LeadsSync] Resetting JobState and using 24-hour window instead.`);
-      await setJobState(JOBSTATE_LAST_LEADS_SYNC_KEY, '');
-      startDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000);
-    }
-    
-    // Fetch leads from Meta API
-    console.time('[LeadsSync] Total Meta fetch');
-    const leads = await fetchLeadsFromMeta(pageId, startDate, endDate);
-    console.timeEnd('[LeadsSync] Total Meta fetch');
-    
-    if (leads.length === 0) {
-      // Recalculate days after potential reset
-      const finalHoursInRange = (endDate - startDate) / (1000 * 60 * 60);
-      const finalDaysInRange = finalHoursInRange / 24;
-      
-      // If date range is reasonable (less than 7 days) and not in the future, advance cursor
-      if (finalDaysInRange <= 7 && startDate <= now) {
-        await setJobState(JOBSTATE_LAST_LEADS_SYNC_KEY, endDate.toISOString());
-      } else {
-        console.warn(`[LeadsSync] ⚠️  Date range issue detected (${finalDaysInRange.toFixed(2)} days, startDate ${startDate > now ? 'in future' : 'valid'}). Not advancing JobState cursor to prevent getting stuck.`);
-        console.warn(`[LeadsSync] JobState will be reset on next run if issue persists.`);
-      }
-      return;
-    }
-    
-    // Save to database
-    console.time('[LeadsSync] Save leads to DB');
-    const result = await saveLeads(leads);
-    console.timeEnd('[LeadsSync] Save leads to DB');
-
-    // Persist last successful sync timestamp only after DB save succeeds
-    await setJobState(JOBSTATE_LAST_LEADS_SYNC_KEY, endDate.toISOString());
   } catch (error) {
     console.error('[LeadsSync] Error in scheduled sync:', error);
-    // Don't throw - allow scheduler to continue
   }
 }
 
 /**
- * Initialize the scheduled job
- * Runs every 15 minutes (900,000 ms)
+ * Initialize the leads sync scheduler.
+ * Runs immediately on startup, then every 15 minutes.
  */
 function startLeadsSyncScheduler() {
-  const pageId = process.env.META_PAGE_ID;
-  
-  if (!pageId) {
-    console.warn('[LeadsSync] ⚠️  META_PAGE_ID not configured in .env file');
-    console.warn('[LeadsSync] To enable scheduled leads sync, add to server/.env:');
-    console.warn('[LeadsSync]    META_PAGE_ID=your_page_id_here');
-    console.warn('[LeadsSync] Example: META_PAGE_ID=113830624877941');
-    console.warn('[LeadsSync] Scheduler will not start until META_PAGE_ID is configured.');
+  const pageIds = getPageIds();
+
+  if (pageIds.length === 0) {
+    console.warn('[LeadsSync] ⚠️  No page IDs configured. Set META_PAGE_IDS=id1,id2,id3,id4 (or META_PAGE_ID) in server/.env to enable scheduled leads sync.');
     return null;
   }
 
-  
-  // Run immediately on startup
-  syncLeads().catch(err => {
-    console.error('[LeadsSync] Error in initial sync:', err);
-  });
-  
-  // Then run every 15 minutes
+  console.log(`[LeadsSync] Scheduler started — syncing ${pageIds.length} page(s) every 15 min: ${pageIds.join(', ')}`);
+
+  // Run immediately on startup to catch any missed leads
+  syncLeads().catch(err => console.error('[LeadsSync] Error in initial sync:', err));
+
+  // Then every 15 minutes
   const intervalId = setInterval(() => {
-    syncLeads().catch(err => {
-      console.error('[LeadsSync] Error in scheduled sync:', err);
-    });
-  }, 15 * 60 * 1000); // 15 minutes in milliseconds
-  
+    syncLeads().catch(err => console.error('[LeadsSync] Error in scheduled sync:', err));
+  }, 15 * 60 * 1000);
+
   return intervalId;
 }
 
