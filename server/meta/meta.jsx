@@ -4584,6 +4584,8 @@ router.post("/leads/db", optionalAuthMiddleware, async (req, res) => {
       ]);
       const allowedCampaignIds = new Set(accountCampaigns.map(c => String(c.campaign_id)).filter(Boolean));
       accountAds.forEach(a => { if (a.campaign_id) allowedCampaignIds.add(String(a.campaign_id)); });
+      // Merge client-supplied campaign IDs (freshly loaded from Meta) so DB-cache gaps don't drop leads
+      campaignIds.forEach(id => { if (id) allowedCampaignIds.add(String(id)); });
       const allowedAdIds = new Set(accountAds.map(a => String(a.ad_id)).filter(Boolean));
 
       // Fetch form_ids from Meta API for each ad account

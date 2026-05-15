@@ -12,8 +12,13 @@ const adAccountsRepo = require('../../repositories/metaAdAccountsRepository');
 const META_API_VERSION = process.env.META_API_VERSION || 'v21.0';
 
 function getAccessToken() {
-  const t = (process.env.META_ACCESS_TOKEN || '').trim();
-  if (!t) throw new Error('META_ACCESS_TOKEN required');
+  const t = (
+    process.env.META_ACCESS_TOKEN ||
+    process.env.META_SYSTEM_ACCESS_TOKEN ||
+    process.env.META_SYSTEM_ACCESS_TOKEN_1 ||
+    ''
+  ).trim();
+  if (!t) throw new Error('META_ACCESS_TOKEN (or META_SYSTEM_ACCESS_TOKEN) required');
   return t;
 }
 

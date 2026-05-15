@@ -552,6 +552,7 @@ const fetchDashboardData = async ({ days = 30, from = null, to = null, campaignI
       }
 
       return {
+        ad_account_id: d.ad_account_id || null,
         campaign_id: d.campaign_id,
         campaign: d.campaign_name || "Unknown Campaign",
         ad_id: d.ad_id || null,
@@ -1315,6 +1316,7 @@ export default function AdsDashboardBootstrap() {
   const [filteredLeadsFormsLoading, setFilteredLeadsFormsLoading] = useState(false);
   const [formDropdownOpen, setFormDropdownOpen] = useState(false);
   const formDropdownRef = React.useRef(null);
+  const loadIdRef = useRef(0);
   const [filteredLeadsTimeRange, setFilteredLeadsTimeRange] = useState(() => {
     const today = new Date();
     const endDate = new Date(today);
@@ -1535,6 +1537,7 @@ export default function AdsDashboardBootstrap() {
   }, [selectedAdAccounts, selectedProject, accountsForProject, specifiedAdAccounts]);
 
   const load = async (useLive = false) => {
+    const loadId = ++loadIdRef.current;
     setLoading(true);
     setCampaignsLoading(true);
     setError(null);
@@ -1766,6 +1769,9 @@ export default function AdsDashboardBootstrap() {
       // Always filter by active status (campaign and ad must be active)
       filteredAllAdsData = filterByActiveStatus(filteredAllAdsData);
 
+
+      // Discard result if a newer load has already started (race condition guard)
+      if (loadId !== loadIdRef.current) return;
 
       setData(filteredData);
       // Store all ads data (without ad filter) for ad breakdown table
@@ -2343,6 +2349,11 @@ export default function AdsDashboardBootstrap() {
     setAccountLeadsError(null);
     try {
       const adAccountIds = selectedAdAccounts.map(id => String(id).replace(/^act_/i, ''));
+      // Pass freshly-loaded campaign IDs so the server can include campaigns not yet in DB cache.
+      // The server merges these with its own DB-cached campaign lookup.
+      const freshCampaignIds = campaigns
+        .map(c => String(c.id || c.campaign_id || ''))
+        .filter(Boolean);
       const token = getAuthToken();
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -2352,6 +2363,7 @@ export default function AdsDashboardBootstrap() {
         headers,
         body: JSON.stringify({
           adAccountIds,
+          campaignIds: freshCampaignIds,
           startDate: dateFilters.startDate,
           endDate: dateFilters.endDate
         })
@@ -3044,9 +3056,14 @@ export default function AdsDashboardBootstrap() {
           })
         : true;
       
-      return matchesCampaign && matchesAd && matchesProject && matchesPlatform && matchesL1Revenue && matchesL2Revenue;
+      // Ad Account filter: when specific accounts selected, only show rows for those accounts
+      const matchesAdAccount = selectedAdAccounts.length === 0 || !r.ad_account_id
+        ? true
+        : selectedAdAccounts.some(id => normalizeAccountId(id) === normalizeAccountId(r.ad_account_id));
+
+      return matchesCampaign && matchesAd && matchesProject && matchesPlatform && matchesL1Revenue && matchesL2Revenue && matchesAdAccount;
     });
-  }, [data, selectedCampaigns, selectedAds, selectedProjects, selectedPlatform, selectedPlatforms, selectedL1Revenue, selectedL2Revenue, campaigns.length, ads.length]);
+  }, [data, selectedAdAccounts, selectedCampaigns, selectedAds, selectedProjects, selectedPlatform, selectedPlatforms, selectedL1Revenue, selectedL2Revenue, campaigns.length, ads.length]);
 
   // Debug logging for multi-select ad filter
   useEffect(() => {
