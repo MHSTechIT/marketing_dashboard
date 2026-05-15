@@ -46,9 +46,11 @@ app.use("/api/unique-leads", uniqueLeadsRoutes);
 const youtubeInsightsRoutes = require("./routes/youtubeInsights");
 app.use("/api/youtube", youtubeInsightsRoutes);
 
-// Leads → Google Sheets real-time sync (webhook + backfill)
+// Leads → Google Sheets real-time sync (webhook + scheduler + backfill)
 const leadsSyncRoutes = require("./routes/leadsSync");
 app.use("/api/leads-sync", leadsSyncRoutes);
+// Start 5-minute auto-sync: runs immediately on boot then every 5 min
+leadsSyncRoutes.startScheduler();
 
 app.get("/", (req, res) => {
   res.send("Backend is running...");
