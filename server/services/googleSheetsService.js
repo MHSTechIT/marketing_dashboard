@@ -69,7 +69,8 @@ function colLetter(n) {
 }
 
 /**
- * Append rows to a sheet.
+ * Append rows to a sheet — uses values.append so the sheet auto-expands
+ * beyond its default 1000-row limit.
  * @param {string} spreadsheetId
  * @param {string} sheetName  e.g. "DW-live data"
  * @param {Array<Array<string>>} rows  2-D array of cell values
@@ -78,24 +79,16 @@ async function appendRows(spreadsheetId, sheetName, rows) {
   if (!rows || rows.length === 0) return;
   const sheets = await getSheetsClient();
 
-  const numCols = rows[0].length;
-  const lastCol = colLetter(numCols);
-
-  // Find current last row so we can write to exact row ranges.
-  const existing = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${sheetName}!A:A` });
-  let startRow = ((existing.data.values || []).length) + 1;
-
   const BATCH = 1000;
   for (let i = 0; i < rows.length; i += BATCH) {
     const chunk = rows.slice(i, i + BATCH);
-    const endRow = startRow + chunk.length - 1;
-    await sheets.spreadsheets.values.update({
+    await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: `${sheetName}!A${startRow}:${lastCol}${endRow}`,
+      range: `${sheetName}!A1`,
       valueInputOption: 'USER_ENTERED',
-      requestBody: { values: chunk }
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: { values: chunk },
     });
-    startRow = endRow + 1;
   }
 }
 
