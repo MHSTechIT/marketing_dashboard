@@ -2613,38 +2613,34 @@ router.get("/instagram/online-followers", optionalAuthMiddleware, async (req, re
 // ---------------------------------------------------------------------
 // 5.2) FORMS API - Fetch leadgen forms for a page
 //    GET /api/meta/pages/:pageId/forms
-//    Uses Page Access Token (required by Meta's leadgen_forms API)
+//    Strategy:
+//      1. Try page-specific token (from cache / exchange)
+//      2. Try system token directly on the page
+//      3. DB fallback: read distinct form_ids from leads table for this page,
+//         then resolve each form name via /{formId}?fields=id,name
 // ---------------------------------------------------------------------
 router.get("/pages/:pageId/forms", optionalAuthMiddleware, async (req, res) => {
   const { pageId } = req.params;
   const formsUrl = `https://graph.facebook.com/${META_API_VERSION}/${pageId}/leadgen_forms`;
   const formFields = "id,name,locale,status";
 
-  // Build ordered list of tokens to try: page token first, then user token, then system token
-  async function tryFetchForms(token) {
+  async function tryFetchPageForms(token) {
     const { data } = await axios.get(formsUrl, {
       params: { access_token: token, fields: formFields, limit: 1000 },
-      timeout: 30000,
+      timeout: 15000,
     });
+    if (data.error) throw Object.assign(new Error(data.error.message), { response: { data } });
     return data.data || [];
   }
 
-  // Collect tokens to attempt in priority order
+  // ── Attempt 1 & 2: page token then system token ───────────────────────────
   const tokensToTry = [];
-
-  // 1. Page-specific access token (best, but may not be available for all pages)
   try {
     const pageToken = await getPageAccessToken(pageId);
     if (pageToken) tokensToTry.push({ label: "page_token", token: pageToken });
-  } catch (_) {
-    // getPageAccessToken failed — continue with fallback tokens
-  }
-
-  // 2. User access token (META_ACCESS_TOKEN) — Meta allows leads_retrieval scope users to call leadgen_forms
+  } catch (_) {}
   const userToken = (process.env.META_ACCESS_TOKEN || '').trim();
   if (userToken) tokensToTry.push({ label: "user_token", token: userToken });
-
-  // 3. System user token
   try {
     const sysToken = getSystemToken();
     if (sysToken) tokensToTry.push({ label: "system_token", token: sysToken });
@@ -2652,23 +2648,66 @@ router.get("/pages/:pageId/forms", optionalAuthMiddleware, async (req, res) => {
 
   for (const { label, token } of tokensToTry) {
     try {
-      const forms = await tryFetchForms(token);
-      console.log(`[Forms] page=${pageId} succeeded with ${label}, count=${forms.length}`);
-      return res.json({ data: forms });
+      const forms = await tryFetchPageForms(token);
+      if (forms.length > 0) {
+        console.log(`[Forms] page=${pageId} ok via ${label}, count=${forms.length}`);
+        return res.json({ data: forms });
+      }
+      console.log(`[Forms] page=${pageId} ${label} returned 0 forms, trying next`);
     } catch (err) {
       const code = err.response?.data?.error?.code;
       console.warn(`[Forms] page=${pageId} ${label} failed (code=${code}):`, err.response?.data?.error?.message || err.message);
-      // If token is expired, clear it from cache so next call re-fetches
-      if (code === 190 && label === "page_token") {
-        delete pageTokenCache.tokens[pageId];
-      }
-      // Continue to next token
+      if (code === 190 && label === "page_token") delete pageTokenCache.tokens[pageId];
     }
   }
 
-  // All tokens exhausted — return empty forms so UI degrades gracefully
-  console.warn(`[Forms] page=${pageId} all token attempts failed — returning empty forms list`);
-  res.json({ data: [], warning: `No valid access token for page ${pageId}. Assign this page to your System User in Meta Business Manager.` });
+  // ── Attempt 3: DB fallback — discover form IDs from leads table ───────────
+  console.log(`[Forms] page=${pageId} — falling back to DB form discovery`);
+  try {
+    const { supabase } = require('../supabase');
+    if (!supabase) throw new Error('Supabase not available');
+
+    // Get all distinct form_ids for this page from the leads table
+    const { data: rows, error: dbErr } = await supabase
+      .from('leads')
+      .select('form_id')
+      .eq('page_id', pageId)
+      .not('form_id', 'is', null);
+
+    if (dbErr) throw dbErr;
+
+    const formIds = [...new Set((rows || []).map(r => r.form_id).filter(Boolean))];
+
+    if (formIds.length === 0) {
+      console.warn(`[Forms] page=${pageId} no form_ids in DB either — returning empty`);
+      return res.json({ data: [], warning: 'No forms found for this page. Check Meta Business Manager permissions.' });
+    }
+
+    // Resolve form names by calling /{formId}?fields=id,name for each
+    let sysToken;
+    try { sysToken = getSystemToken(); } catch (_) { sysToken = ''; }
+
+    const resolvedForms = await Promise.all(
+      formIds.map(async (fid) => {
+        try {
+          const { data: fd } = await axios.get(
+            `https://graph.facebook.com/${META_API_VERSION}/${fid}`,
+            { params: { access_token: sysToken, fields: 'id,name,status' }, timeout: 8000 }
+          );
+          return { id: fd.id || fid, name: fd.name || `Form ${fid}`, status: fd.status || 'ACTIVE' };
+        } catch (_) {
+          return { id: fid, name: `Form ${fid}`, status: 'ACTIVE' };
+        }
+      })
+    );
+
+    console.log(`[Forms] page=${pageId} DB fallback resolved ${resolvedForms.length} form(s)`);
+    return res.json({ data: resolvedForms });
+  } catch (dbFallbackErr) {
+    console.error(`[Forms] page=${pageId} DB fallback failed:`, dbFallbackErr.message);
+  }
+
+  res.json({ data: [], warning: `No valid access token for page ${pageId}. Add System User to this page in Meta Business Manager.` });
 });
 
 // ---------------------------------------------------------------------
