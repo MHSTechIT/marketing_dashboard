@@ -1,15 +1,46 @@
 /**
- * AI Insights API – uses Anthropic Claude to generate marketing insights and recommendations.
- * Requires ANTHROPIC_API_KEY in server .env.
+ * AI Insights API – uses Google Gemini to generate marketing insights and recommendations.
+ * Requires GOOGLE_GEMINI_API_KEY in server .env.
  */
 
 const express = require('express');
-const Anthropic = require('@anthropic-ai/sdk');
-const crypto = require('crypto');
+const axios   = require('axios');
+const crypto  = require('crypto');
 
 const router = express.Router();
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const CLAUDE_MODEL = 'claude-sonnet-4-6';
+const GEMINI_MODEL = 'gemini-2.0-flash-lite';
+
+/** Call Google Gemini REST API via axios (no SDK needed). */
+async function callGemini(prompt, { system = '', temperature = 0.6, maxTokens = 8192 } = {}) {
+  const key = process.env.GOOGLE_GEMINI_API_KEY;
+  const body = {
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: { temperature, maxOutputTokens: maxTokens },
+  };
+  if (system) body.systemInstruction = { parts: [{ text: system }] };
+
+  const { data } = await axios.post(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`,
+    body,
+    { timeout: 30000 }
+  );
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('Gemini returned no content');
+  return text;
+}
+
+/** Parse Gemini/axios errors into a clean { status, message, errorCode } object. */
+function parseGeminiError(err) {
+  if (err.response) {
+    const status = err.response.status;
+    const data   = err.response.data;
+    const message = data?.error?.message || err.message || 'Gemini request failed';
+    const code    = data?.error?.status  || '';
+    if (status === 429 || code === 'RESOURCE_EXHAUSTED') return { status: 429, message, errorCode: 'quota_exceeded' };
+    return { status: status || 500, message, errorCode: code || 'ai_error' };
+  }
+  return { status: 500, message: err.message || 'AI request failed', errorCode: 'ai_error' };
+}
 
 /** In-memory cache for Gemini AI insights to reduce quota usage. TTL 15 min. */
 const AI_INSIGHTS_CACHE_TTL_SEC = 15 * 60;
@@ -107,11 +138,11 @@ Rules: Include exactly 6 items in "insights" and 4 in "recommendations". ids 1-b
  * Otherwise falls back to single bestAd/bestReel or full AI-generated data.
  */
 router.post('/insights', async (req, res) => {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.GOOGLE_GEMINI_API_KEY) {
     return res.status(503).json({
       success: false,
       error: 'AI insights not configured',
-      details: 'Add ANTHROPIC_API_KEY to server .env'
+      details: 'Add GOOGLE_GEMINI_API_KEY to server .env'
     });
   }
 
@@ -145,22 +176,7 @@ router.post('/insights', async (req, res) => {
       prompt = PROMPT_WITH_REAL_DATA(adForPrompt, reelForPrompt, dateRange, selectedPeriod);
     }
 
-    const message = await anthropic.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 8192,
-      temperature: 0.6,
-      messages: [{ role: 'user', content: prompt }]
-    });
-
-    let text = message.content?.[0]?.text;
-    if (!text) {
-      return res.status(502).json({
-        success: false,
-        error: 'AI returned no content',
-        details: message.stop_reason || 'No content'
-      });
-    }
-
+    let text = await callGemini(prompt, { temperature: 0.6, maxTokens: 8192 });
     text = text.trim();
     const jsonMatch = text.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/) || text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
     if (jsonMatch) text = jsonMatch[1].trim();
@@ -202,18 +218,10 @@ router.post('/insights', async (req, res) => {
     setCachedAIInsights(cacheKey, responsePayload);
     return res.json(responsePayload);
   } catch (err) {
-    const status = err.status === 429 ? 429 : err.status === 400 ? 400 : 500;
-    const message = err.message || 'AI request failed';
-    console.error('[AI Insights] Claude error:', message);
-    const payload = {
-      success: false,
-      error: 'AI insights request failed',
-      details: message
-    };
-    if (status === 429) {
-      const match = message.match(/retry in (\d+(?:\.\d+)?)\s*s/i) || message.match(/(\d+(?:\.\d+)?)\s*sec/i);
-      if (match) payload.retryAfterSeconds = Math.ceil(parseFloat(match[1]));
-    }
+    const { status, message, errorCode } = parseGeminiError(err);
+    console.error('[AI Insights] Gemini error:', message);
+    const payload = { success: false, error: errorCode || 'ai_error', details: message };
+    if (status === 429) payload.retryAfterSeconds = 60;
     return res.status(status).json(payload);
   }
 });
@@ -225,11 +233,11 @@ const ASK_SYSTEM = `You are a helpful marketing analytics assistant for a Meta/I
  * Body: { question: string, context?: object } — answers user questions with Claude using optional dashboard snapshot.
  */
 router.post('/ask', async (req, res) => {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.GOOGLE_GEMINI_API_KEY) {
     return res.status(503).json({
       success: false,
       error: 'AI not configured',
-      details: 'Add ANTHROPIC_API_KEY to server .env'
+      details: 'Add GOOGLE_GEMINI_API_KEY to server .env'
     });
   }
 
@@ -258,41 +266,16 @@ router.post('/ask', async (req, res) => {
     : question;
 
   try {
-    const message = await anthropic.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 2048,
-      temperature: 0.45,
-      system: ASK_SYSTEM,
-      messages: [{ role: 'user', content: userContent }]
-    });
-
-    let text = message.content?.[0]?.text;
-    if (!text || !String(text).trim()) {
-      return res.status(502).json({
-        success: false,
-        error: 'AI returned no answer',
-        details: message.stop_reason || 'No content'
-      });
-    }
-
+    let text = await callGemini(userContent, { system: ASK_SYSTEM, temperature: 0.45, maxTokens: 2048 });
     text = String(text).trim();
     const fence = text.match(/^```(?:\w+)?\s*([\s\S]*?)\s*```$/);
     if (fence) text = fence[1].trim();
-
     return res.json({ success: true, answer: text });
   } catch (err) {
-    const status = err.status === 429 ? 429 : err.status === 400 ? 400 : 500;
-    const message = err.message || 'AI request failed';
-    console.error('[AI Ask] Claude error:', message);
-    const payload = {
-      success: false,
-      error: 'AI ask request failed',
-      details: message
-    };
-    if (status === 429) {
-      const match = message.match(/retry in (\d+(?:\.\d+)?)\s*s/i) || message.match(/(\d+(?:\.\d+)?)\s*sec/i);
-      if (match) payload.retryAfterSeconds = Math.ceil(parseFloat(match[1]));
-    }
+    const { status, message, errorCode } = parseGeminiError(err);
+    console.error('[AI Ask] Gemini error:', message);
+    const payload = { success: false, error: errorCode || 'ai_error', details: message };
+    if (status === 429) payload.retryAfterSeconds = 60;
     return res.status(status).json(payload);
   }
 });

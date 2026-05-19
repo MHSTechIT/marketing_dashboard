@@ -1,0 +1,757 @@
+/* ===========================
+   BEST PERFORMING AD (NEW DESIGN)
+   =========================== */
+
+/* Global Page Background */
+.best-ad-container {
+    background-color: #f0f4f8;
+    /* Light blue-ish gray background from image */
+    min-height: 100vh;
+    padding: 24px;
+    font-family: 'Inter', sans-serif;
+    color: #334155;
+}
+
+/* ===== FILTERS BAR ===== */
+.filters-bar {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    animation: filtersFadeIn 0.35s ease-out;
+}
+@keyframes filtersFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.filter-block {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.filter-block:first-child {
+    flex: 1;
+    min-width: 180px;
+}
+
+.filter-block.custom-select-wrapper {
+    flex: 1;
+    min-width: 160px;
+}
+
+/* Ad Account dropdown: limit width so dropdown has spacing from page edge */
+.filter-block.filter-block-ad-account {
+    max-width: 320px;
+    min-width: 200px;
+}
+
+.filter-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
+    margin: 0;
+}
+
+/* Time Range button - prevent text cutoff, match select height */
+.filter-time-range-btn {
+    min-height: 40px;
+    line-height: 1.4;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+.filter-time-range-btn:hover {
+    border-color: #94a3b8 !important;
+}
+.filter-time-range-btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+.filter-time-range-text {
+    line-height: 1.4;
+    padding: 2px 0;
+}
+
+.filter-emoji {
+    margin-right: 4px;
+}
+
+/* ===== Empty state (no insights data) ===== */
+.best-ad-empty-state {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 28px 32px;
+    margin-bottom: 24px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+.best-ad-empty-state-icon {
+    font-size: 2.5rem;
+    margin-bottom: 12px;
+    opacity: 0.9;
+}
+.best-ad-empty-state-title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #334155;
+    margin: 0 0 8px 0;
+}
+.best-ad-empty-state-text {
+    color: #64748b;
+    font-size: 0.9rem;
+    margin: 0 0 12px 0;
+}
+.best-ad-empty-state-list {
+    text-align: left;
+    max-width: 480px;
+    margin: 0 auto;
+    padding-left: 1.25rem;
+    color: #475569;
+    font-size: 0.875rem;
+    line-height: 1.6;
+}
+.best-ad-empty-state-list li {
+    margin-bottom: 6px;
+}
+.best-ad-empty-state-list code {
+    background: #f1f5f9;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.8em;
+}
+
+.custom-select-wrapper {
+    position: relative;
+    flex: 1;
+}
+
+.filter-select {
+    width: 100%;
+    min-height: 40px;
+    padding: 9px 32px 9px 12px;
+    line-height: 1.4;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    background-color: white;
+    color: #475569;
+    font-size: 0.9rem;
+    font-weight: 500;
+    appearance: none;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    box-sizing: border-box;
+    overflow: visible;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.filter-select:hover {
+    border-color: #94a3b8;
+}
+
+.filter-select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* ===== All Projects custom dropdown (hover split view) ===== */
+.projects-dropdown-wrapper {
+    flex: 1;
+    min-width: 160px;
+}
+
+.projects-dropdown {
+    position: relative;
+    width: 100%;
+}
+
+.projects-dropdown-trigger {
+    width: 100%;
+    min-height: 40px;
+    padding: 9px 32px 9px 12px;
+    line-height: 1.4;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    background-color: white;
+    color: #475569;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.projects-dropdown-trigger:hover {
+    border-color: #94a3b8;
+}
+
+.projects-dropdown-trigger:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.projects-dropdown-trigger-text {
+    flex: 1;
+    text-align: left;
+}
+
+.projects-dropdown-panel {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    min-width: 320px;
+    max-width: 420px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    z-index: 1000;
+    display: flex;
+    overflow: hidden;
+}
+
+.projects-dropdown-left {
+    flex: 0 0 45%;
+    min-width: 140px;
+    max-height: 320px;
+    overflow-y: auto;
+    border-right: 1px solid #e2e8f0;
+}
+
+.projects-dropdown-project-row {
+    padding: 10px 12px;
+    font-size: 0.875rem;
+    color: #334155;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.projects-dropdown-project-row:hover {
+    background-color: #f1f5f9;
+}
+
+.projects-dropdown-project-row-selected {
+    background-color: #eff6ff;
+    font-weight: 600;
+    color: #1e40af;
+}
+
+.projects-dropdown-right {
+    flex: 1;
+    min-width: 160px;
+    max-height: 320px;
+    overflow-y: auto;
+    padding: 12px;
+    background-color: #f8fafc;
+}
+
+.projects-dropdown-all-accounts {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.projects-dropdown-project-group {
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 8px;
+}
+
+.projects-dropdown-project-group:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.projects-dropdown-group-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #475569;
+    margin-bottom: 4px;
+}
+
+.projects-dropdown-placeholder {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    display: block;
+}
+
+.projects-dropdown-account-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.projects-dropdown-account-item {
+    font-size: 0.8rem;
+    color: #475569;
+    padding: 6px 0;
+    line-height: 1.4;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.projects-dropdown-account-item:last-child {
+    border-bottom: none;
+}
+
+/* ===== KPI CARDS (Dashboard-style, same as Ads Analytics Dashboard) ===== */
+.kpi-card {
+    height: 90%;
+    border-radius: 10px;
+    padding: 1rem;
+    color: white;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.kpi-card:hover {
+    box-shadow: 0 8px 16px -2px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+/* KPI row subtle entrance */
+.best-ad-container .row.g-3.mb-4 {
+    animation: kpiRowFadeIn 0.4s ease-out 0.05s both;
+}
+@keyframes kpiRowFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.kpi-card-primary {
+    background: linear-gradient(135deg, #5b45b0 0%, #483690 100%);
+}
+
+.kpi-card-success {
+    background: linear-gradient(135deg, #0d47a1 0%, #082d6b 100%);
+}
+
+.kpi-card-warning {
+    background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
+}
+
+.kpi-card-purple {
+    background: linear-gradient(135deg, #d81b60 0%, #ad1457 100%);
+}
+
+.kpi-card-info {
+    background: linear-gradient(135deg, #00897b 0%, #006056 100%);
+}
+
+.kpi-card-teal {
+    background: linear-gradient(135deg, #00acc1 0%, #00838f 100%);
+}
+
+.kpi-card-body {
+    position: relative;
+    z-index: 2;
+}
+
+.kpi-card .kpi-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    opacity: 0.9;
+    text-transform: capitalize;
+    display: block;
+}
+
+.kpi-card .kpi-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin: 0.4rem 0;
+    color: white;
+}
+
+.kpi-card .kpi-icon {
+    position: absolute;
+    right: 0.85rem;
+    top: 0.85rem;
+    font-size: 2rem;
+    opacity: 0.2;
+}
+
+.kpi-card .kpi-subtitle {
+    font-size: 0.75rem;
+    opacity: 0.8;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* ===== Legacy KPI grid (kept for any other usage) ===== */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.kpi-card-new {
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 100px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    position: relative;
+}
+
+.kpi-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+    opacity: 0.9;
+}
+
+.kpi-value-lg {
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin-bottom: 4px;
+    letter-spacing: -0.5px;
+}
+
+.kpi-trend {
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Specific Card Styles */
+.kpi-white {
+    background: white;
+    border: 1px solid #e2e8f0;
+    color: #1e293b;
+}
+
+.kpi-white .kpi-title {
+    color: #64748b;
+}
+
+.kpi-white .kpi-value-lg {
+    color: #1e293b;
+}
+
+.kpi-white .kpi-trend {
+    color: #10b981;
+}
+
+/* Green trend */
+.kpi-white::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background-color: #8b5cf6;
+    /* Purple accent border */
+    border-top-left-radius: 12px;
+    border-bottom-left-radius: 12px;
+}
+
+.kpi-blue-dark {
+    background-color: #0f4c81;
+    /* Deep Blue */
+    color: white;
+}
+
+.kpi-blue-light {
+    background-color: #0088cc;
+    /* Cerulean */
+    color: white;
+}
+
+.kpi-green {
+    background-color: #00bfa5;
+    /* Teal/Green */
+    color: white;
+}
+
+.kpi-red {
+    background-color: #e55368;
+    /* Salmon/Red */
+    color: white;
+}
+
+.kpi-purple {
+    background-color: #7b4397;
+    /* Purple */
+    color: white;
+}
+
+
+/* ===== MIDDLE SECTION (Funnel + Line Chart) ===== */
+.middle-section {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+/* Card Container for Charts - micro-animation on appear */
+.chart-box {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    border: 1px solid #f1f5f9;
+    transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.2s ease;
+}
+.chart-tooltip-custom {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    font-size: 0.8rem;
+    min-width: 180px;
+}
+
+.chart-box:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border-color: #e2e8f0;
+}
+
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.chart-title-text {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+/* ===== PERFORMANCE FUNNEL (custom - no overlap, clear shape) ===== */
+.performance-funnel {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 0;
+    min-height: 260px;
+    justify-content: center;
+}
+
+.funnel-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 64px;
+    animation: funnelRowIn 0.35s ease-out both;
+}
+
+@keyframes funnelRowIn {
+    from {
+        opacity: 0;
+        transform: translateX(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.funnel-segment-wrap {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    min-width: 0;
+}
+
+/* Trapezoid segment - funnel shape (wide top → narrow bottom) */
+.funnel-segment {
+    width: var(--funnel-width, 90%);
+    height: 56px;
+    background: var(--funnel-fill, #4338ca);
+    border-radius: 6px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.performance-funnel .funnel-row:nth-child(1) .funnel-segment {
+    clip-path: polygon(0 0, 100% 0, 92% 100%, 8% 100%);
+}
+.performance-funnel .funnel-row:nth-child(2) .funnel-segment {
+    clip-path: polygon(8% 0, 92% 0, 84% 100%, 16% 100%);
+}
+.performance-funnel .funnel-row:nth-child(3) .funnel-segment {
+    clip-path: polygon(16% 0, 84% 0, 50% 100%, 50% 100%);
+}
+
+.funnel-segment:hover {
+    transform: scale(1.01);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Label + count always visible, no overlap */
+.funnel-label-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    min-width: 100px;
+    flex-shrink: 0;
+}
+
+.funnel-label-name {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #1e293b;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+
+.funnel-label-value {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #475569;
+    line-height: 1.3;
+    margin-top: 2px;
+    white-space: nowrap;
+}
+
+
+/* ===== THREE BOTTOM CHARTS ===== */
+.bottom-charts-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+
+/* ===== TABLE SECTION ===== */
+.table-container {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    overflow-x: auto;
+}
+
+.performance-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+}
+
+.performance-table th {
+    text-align: left;
+    padding: 12px 8px;
+    background-color: #f8fafc;
+    color: #64748b;
+    font-weight: 700;
+    border-bottom: 2px solid #e2e8f0;
+    white-space: nowrap;
+}
+
+.performance-table td {
+    padding: 10px 8px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+    font-weight: 500;
+}
+
+/* Campaign performance table: scroll within container (like Total Leads) */
+.campaign-table-scroll {
+    max-height: 500px;
+    overflow-y: auto;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    min-width: 800px;
+}
+
+.campaign-table-scroll .performance-table thead th {
+    background-color: #f8f9fa;
+}
+
+.conversion-count-input {
+    width: 72px;
+    max-width: 100%;
+    padding: 6px 8px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    background: #fff;
+    color: #334155;
+    box-sizing: border-box;
+}
+
+.conversion-count-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+/* Table Heatmap Colors (Classes applied dynamically) */
+.cell-heatmap-high {
+    background-color: rgba(16, 185, 129, 0.2);
+}
+
+/* Green tint */
+.cell-heatmap-mid {
+    background-color: rgba(59, 130, 246, 0.1);
+}
+
+/* Blue tint */
+.cell-heatmap-low {
+    background-color: rgba(244, 63, 94, 0.1);
+}
+
+/* Red tint */
+.cell-heatmap-neutral {
+    background-color: transparent;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .kpi-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .middle-section {
+        grid-template-columns: 1fr;
+    }
+
+    .bottom-charts-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .filters-bar {
+        flex-direction: column;
+    }
+}

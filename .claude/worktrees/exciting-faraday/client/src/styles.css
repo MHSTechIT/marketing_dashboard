@@ -1,0 +1,338 @@
+/* ===== Global Theme Variables ===== */
+
+/* fallback so var(--bs-dropdown-bg) is always defined */
+
+  
+  /* Light Theme */
+:root[data-theme='light'] {
+  --bg: #f5f7fa;           /* Clean, bright neutral background */
+  --text: #1a1d1f;         /* Soft black for high readability */
+  --card: #ffffff;         /* Pure white cards for clarity */
+
+  /* Primary Button */
+  --btn: #0d6efd;          /* Professional blue */
+  --btn-text: #ffffff;     /* Strong contrast */
+
+  /* Navigation Bar */
+  --nav: #ffffff;          /* White nav for clean header */
+  --nav-text: #1a1d1f;     /* Dark text for contrast */
+
+  /* Accent background (body) */
+  --bs-body-bg: #e9edf3;   /* Very light gray-blue tint */
+}
+
+  /* Dark Theme */
+:root[data-theme='dark'] {
+  /* Base */
+  --bg: #111827;          /* Main app background – deep slate */
+  --text: #e5e7eb;        /* Light gray text (not pure white, easier on eyes) */
+  
+  /* Surfaces */
+  --card: #1f2933;        /* Elevated card/background panels */
+  
+  /* Primary Button */
+  --btn: #3b82f6;         /* Modern blue accent */
+  --btn-text: #f9fafb;    /* Nearly white, great contrast */
+
+  /* Navigation Bar */
+  --nav: #020617;         /* Slightly darker than bg for header/sidebar */
+  --nav-text: #e5e7eb;
+
+  /* Body Background */
+  --bs-body-bg: #020617;  /* Outer body background (behind main content) */
+  
+  /* Dropdown */
+  --bs-dropdown-bg: #1f2933;
+}
+
+  /* Classic Dark Theme */
+  :root[data-theme='classic-dark'] {
+  /* Base */
+  --bg: #000000;          /* Pure black background */
+  --text: #ffffff;        /* Pure white text */
+  
+  /* Surfaces */
+  --card: #1a1a1a;        /* Very dark gray cards */
+  
+  /* Primary Button */
+  --btn: #6366f1;         /* Indigo accent */
+  --btn-text: #ffffff;    /* White text */
+
+  /* Navigation Bar */
+  --nav: #000000;         /* Pure black nav */
+  --nav-text: #ffffff;
+
+  /* Body Background */
+  --bs-body-bg: #0a0a0a;  /* Near black body background */
+  
+  /* Dropdown */
+  --bs-dropdown-bg: #1a1a1a;
+}
+
+  
+ :root[data-theme='primary'] {
+  /* Base Colors */
+  --bg: #f4f7fb;           /* Soft, clean background */
+  --text: #0b1e38;         /* Deep navy text, great readability */
+  
+  /* Card / Surfaces */
+  --card: #ffffff;         /* Pure white for contrast */
+  
+  /* Brand / Accent Blue */
+  --btn: #2b6cb0;          /* Calm, modern blue */
+  --btn-text: #ffffff;     /* Strong contrast */
+  
+  /* Navigation */
+  --nav: #346baa;          /* Rich professional blue */
+  --nav-text: #ffffff;     /* White text for clarity */
+  
+  /* Body Background Accent */
+  --bs-body-bg: #c7d7f3;   /* Lighter tint for subtle page background */
+}
+
+  
+/* Danger Theme */
+:root[data-theme='danger'] {
+  /* Base */
+  --bg: #fdf3f3;            /* Gentle red-tinted background */
+  --text: #7a1020;          /* Deep wine red text */
+  
+  /* Card Surfaces */
+  --card: #ffffff;          /* Clean white cards */
+  
+  /* Primary Action Button */
+  --btn: #c62828;           /* Mature, strong red */
+  --btn-text: #ffffff;      /* White text for contrast */
+  
+  /* Navigation Bar */
+  --nav: #a71616;           /* Slightly darker version for nav */
+  --nav-text: #ffffff;
+  
+  /* Body Page Accent */
+  --bs-body-bg: #f2cccc;    /* Subtle soft tone, avoids eye strain */
+}
+
+  
+  /* Success Theme */
+  :root[data-theme='success'] {
+    --bg: #e8f5e9;
+    --text: #004d25;
+    --card: #ffffff;
+    --btn: #198754;
+    --btn-text: #ffffff;
+    --nav: #198754;
+    --nav-text: #ffffff;
+    --bs-dropdown-bg: #8fc69f;
+    --bs-body-bg:#8fc69f;
+  }
+  
+  /* ===== Global Styling ===== */
+  
+  html,
+  body {
+    height: 100%;
+  }
+  
+  body {
+    background: var(--bg);
+    color: var(--text);
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  /* Smooth transitions for all theme-aware elements */
+  * {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  }
+  
+  /* Exclude certain elements from transitions for performance */
+  *, *::before, *::after {
+    transition-property: background-color, color, border-color, box-shadow;
+  }
+  
+  /* Exclude interactive elements from color transitions */
+  input, textarea, select, button, a {
+    transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+  
+  /* Navbar Styling */
+  .navbar {
+    background: var(--nav) !important;
+    transition: background 0.3s ease;
+    font-size: 12px;
+  }
+  .sidebar{
+    background: var(--nav) !important;
+    transition: background 0.3s ease;
+    font-size: 12px;
+    
+  }
+  .sidebar .nav-link,
+  .sidebar .sidebar-brand {
+    color: var(--nav-text) !important;
+    transition: color 0.3s ease;
+    
+  }
+  .navbar .nav-link,
+  .navbar .navbar-brand {
+    color: var(--nav-text) !important;
+    transition: color 0.3s ease;
+    
+  }
+  
+  /* Card / Table / Form Styling */
+  .card,
+  .table,
+  .form-control,
+  .form-select,
+  select,
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  textarea {
+    background: var(--card) !important;
+    color: var(--text) !important;
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  }
+  
+  /* Ensure form controls have proper borders */
+  .form-control,
+  .form-select,
+  select,
+  input {
+    border-color: rgba(0, 0, 0, 0.1) !important;
+  }
+  
+  [data-theme='dark'] .form-control,
+  [data-theme='dark'] .form-select,
+  [data-theme='dark'] select,
+  [data-theme='dark'] input,
+  [data-theme='classic-dark'] .form-control,
+  [data-theme='classic-dark'] .form-select,
+  [data-theme='classic-dark'] select,
+  [data-theme='classic-dark'] input {
+    border-color: rgba(255, 255, 255, 0.2) !important;
+  }
+  
+  /* Buttons */
+  .btn {
+    background: var(--btn) !important;
+    color: var(--btn-text) !important;
+    border: none;
+    transition: background 0.2s ease;
+    font-size: 12px;
+  }
+  
+  /* App Body */
+  .app-body {
+    background: var(--bg);
+    font-size: 12px;
+  }
+  
+  /* ===== Dropdown Styling ===== */
+  
+  /* Dropdown container */
+  .dropdown-menu {
+    background-color: var(--bs-dropdown-bg) !important;
+    color: var(--text) !important;
+    border: none !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    transition: background-color 0.3s ease;
+    font-size: 12px;
+  }
+  
+  /* Dropdown items */
+  .dropdown-item {
+    color: var(--text) !important;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+  
+  .dropdown-item:hover,
+  .dropdown-item:focus {
+    background-color: rgba(0, 0, 0, 0.08) !important;
+  }
+  
+
+  /* ===== Fix Bootstrap Dropdown Variable Override ===== */
+/* [data-theme] .dropdown-menu {
+    --bs-dropdown-bg: var(--bs-dropdown-bg) !important;
+    background-color: var(--bs-dropdown-bg) !important;
+  } */
+  .form-label {
+    margin-bottom: 0rem !important;
+    font-size: 12px !important;
+}
+.h5, h5 {
+    font-size: 1rem !important;
+}   
+
+.admin-dropdown-btn {
+  background-color: var(--bs-primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 5px 12px;
+}
+
+.admin-dropdown-btn:hover {
+  opacity: 0.9;
+}
+
+/* Dropdown panel */
+.admin-dropdown {
+  border-radius: 8px;
+  padding: 0;
+  background-color: var(--bs-body-bg);
+  border: 1px solid var(--bs-border-color);
+  box-shadow: 0px 4px 14px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  animation: fadeIn 0.15s ease-in-out;
+}
+
+/* Dropdown Rows */
+.admin-dropdown-item {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--bs-border-color);
+  color: var(--bs-body-color);
+  transition: background 0.2s ease, padding-left 0.2s ease;
+}
+
+.admin-dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.admin-dropdown-item:hover {
+  background-color: var(--bs-primary);
+  color: #fff;
+  padding-left: 18px;
+}
+
+/* Fade Animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.text-white{
+  color: var(--text) !important;
+}
+.form-select{
+  color: var(--text) !important;
+}
+
+.custom-header-style{
+  color: var(--text) !important;
+  background: var(--nav) !important;
+}
+.login-bg{
+  color: var(--text) !important;
+  background: var(--nav) !important;
+}
+
+
+

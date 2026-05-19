@@ -1,0 +1,650 @@
+/* ===========================
+   AUDIENCE PAGE
+   Modern Premium Design
+   =========================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+/* ===== ROOT VARIABLES ===== */
+:root {
+    /* Premium Gradients */
+    --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --gradient-teal: linear-gradient(135deg, #009688 0%, #00695C 100%);
+
+    /* Backgrounds */
+    --bg-primary: #f3f4f6;
+    --bg-secondary: #ffffff;
+    --bg-dark: #0f2d5e;
+    --bg-card-dark: #1e293b;
+
+    /* Text Colors */
+    --text-primary: #1a202c;
+    --text-secondary: #64748b;
+    --text-light: #94a3b8;
+    --text-white: #ffffff;
+
+    /* Borders & Shadows */
+    --border-light: #e2e8f0;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+
+    /* Spacing */
+    --spacing-sm: 1rem;
+    --spacing-md: 1.5rem;
+    --spacing-lg: 2rem;
+
+    /* Border Radius */
+    --radius-sm: 0.5rem;
+    --radius-md: 0.75rem;
+    --radius-lg: 1rem;
+    --radius-xl: 1.5rem;
+    --radius-full: 9999px;
+}
+
+/* Dark Theme */
+[data-theme="dark"] {
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --border-light: #334155;
+}
+
+/* ===== FILTER SECTION (Content Marketing style) ===== */
+.filter-card {
+    background: var(--bg-secondary);
+    border-radius: 10px;
+    padding: 0.85rem;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-light);
+    color: var(--text-primary);
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    box-sizing: border-box;
+    max-width: 100%;
+}
+
+.filter-card .row {
+    flex-wrap: wrap;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.filter-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    margin-bottom: 0.2rem;
+    opacity: 0.8;
+}
+
+/* ===== TOP ROW: uniform padding and extra gap above Page performance ===== */
+.audience-top-row {
+    margin-bottom: 2rem;
+}
+
+.audience-top-row .filter-card {
+    padding: 0.55rem 0.75rem;
+    margin-bottom: 0;
+}
+
+/* ===== FOLLOWERS AND NON-FOLLOWERS CARD (right of filters) ===== */
+.audience-followers-card .filter-card-body {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.audience-followers-label {
+    margin-bottom: 0.5rem !important;
+}
+
+.audience-followers-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.audience-followers-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.audience-followers-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    min-width: 7.5rem;
+}
+
+.audience-followers-bar-wrap {
+    flex: 1;
+    height: 1.25rem;
+    background: #e2e8f0;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.audience-followers-bar {
+    height: 100%;
+    min-width: 2%;
+    background: #1e828e;
+    border-radius: 999px;
+}
+
+.audience-followers-pct {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    min-width: 2.5rem;
+    text-align: right;
+}
+/* ===== LAYOUT (Main Page Container) ===== */
+.audience-container {
+    background: var(--bg-primary) !important;
+    min-height: 100vh;
+    padding: var(--spacing-lg);
+    transition: background 0.3s ease;
+}
+
+/* ===== TYPOGRAPHY (Headings like "Age & Gender Distribution") ===== */
+.audience-title {
+    color: var(--text-white) !important;
+    font-weight: 900 !important;
+    margin-bottom: 0 !important;
+    font-size: 2.25rem !important;
+    letter-spacing: -0.5px !important;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.audience-subtitle {
+    color: var(--text-secondary) !important;
+    margin-bottom: 0 !important;
+    font-weight: 500 !important;
+}
+
+.section-title {
+    font-weight: 800 !important;
+    color: var(--text-primary) !important;
+    margin-bottom: var(--spacing-md) !important;
+    font-size: 1.375rem !important;
+    letter-spacing: -0.5px !important;
+}
+
+/* ===== HEADER (Top Controls area) ===== */
+.header-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--spacing-lg);
+}
+
+.header-controls {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.control-button {
+    background: var(--bg-secondary) !important;
+    border: 2px solid var(--border-light) !important;
+    box-shadow: var(--shadow-sm) !important;
+    padding: 0.75rem 1.5rem !important;
+    border-radius: var(--radius-sm) !important;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    color: var(--text-primary) !important;
+    font-weight: 600 !important;
+    transition: all 0.3s ease !important;
+}
+
+.control-button:hover {
+    border-color: #667eea !important;
+    box-shadow: var(--shadow-md) !important;
+    transform: translateY(-2px) !important;
+}
+
+/* ===== CARDS (White Containers for Charts & Lists) ===== */
+.audience-card {
+    border: 1px solid var(--border-light) !important;
+    border-radius: var(--radius-xl) !important;
+    box-shadow: var(--shadow-md) !important;
+    background: var(--bg-secondary) !important;
+    transition: all 0.3s ease !important;
+}
+
+.audience-card:hover {
+    box-shadow: var(--shadow-lg) !important;
+    transform: translateY(-2px) !important;
+}
+
+.audience-card-body {
+    padding: var(--spacing-lg) !important;
+}
+
+/* ===== TABS (Navigation: "Demographics", "Platform") ===== */
+.tabs-container {
+    display: flex;
+    gap: var(--spacing-lg);
+    border-bottom: 2px solid var(--border-light);
+    width: 100%;
+    margin-bottom: var(--spacing-md);
+}
+
+.tab-button {
+    padding: 0;
+    padding-bottom: var(--spacing-sm);
+    border: none;
+    border-radius: 0;
+    font-weight: 700 !important;
+    font-size: 1rem !important;
+    background: transparent;
+    color: var(--text-secondary) !important;
+    transition: all 0.2s ease;
+    letter-spacing: 0.2px;
+}
+
+.tab-button:hover {
+    color: #667eea !important;
+}
+
+.tab-button-active {
+    color: #667eea !important;
+    border-bottom: 3px solid #667eea !important;
+    margin-bottom: -2px;
+}
+
+/* Explicit Tab Buttons for Audience Page */
+.audience-tab-btn {
+    border-radius: 30px !important;
+    padding: 0.5rem 1.5rem !important;
+    font-weight: 700 !important;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease !important;
+    border: 1px solid transparent !important;
+}
+
+.audience-tab-btn.active {
+    background-color: #ffffff !important;
+    color: #0f2d5e !important;
+    border-color: #e2e8f0 !important;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05) !important;
+}
+
+.audience-tab-btn.inactive {
+    background-color: transparent !important;
+    color: #64748b !important;
+    border-color: transparent !important;
+}
+
+.audience-tab-btn:hover {
+    transform: translateY(-1px);
+}
+
+/* ===== BUTTONS (Dropdowns: "All Genders", "Reach", "Results") ===== */
+.export-button {
+    border: 2px solid var(--border-light) !important;
+    background: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+    padding: 0.5rem 1.25rem !important;
+    border-radius: var(--radius-sm) !important;
+    font-size: 0.9375rem !important;
+    font-weight: 700 !important;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    transition: all 0.3s ease !important;
+}
+
+.export-button:hover {
+    border-color: #667eea !important;
+    color: #667eea !important;
+    box-shadow: var(--shadow-sm) !important;
+    transform: translateY(-2px) !important;
+}
+
+/* Explicit Dropdown Buttons for Audience Page */
+.audience-dropdown-btn {
+    background-color: #ffffff !important;
+    color: #1a202c !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 20px !important;
+    padding: 0.5rem 1rem !important;
+    font-weight: 600 !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 140px;
+}
+
+.audience-dropdown-btn:hover,
+.audience-dropdown-btn:focus,
+.audience-dropdown-btn[aria-expanded="true"] {
+    background-color: #f8fafc !important;
+    color: #0f2d5e !important;
+    border-color: #cbd5e1 !important;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Force dropdown arrow color */
+.audience-dropdown-btn::after {
+    border-top-color: #64748b !important;
+    margin-left: 0.5rem;
+}
+
+/* ===== METRICS (Stat Numbers & Labels) ===== */
+.metric-label {
+    font-weight: 800 !important;
+    margin-bottom: 0 !important;
+    font-size: 1.125rem !important;
+    color: var(--text-primary) !important;
+    letter-spacing: -0.3px !important;
+}
+
+.metric-sublabel {
+    color: var(--text-secondary) !important;
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+}
+
+.metric-value {
+    font-weight: 900 !important;
+    margin-bottom: 0 !important;
+    margin-top: 0.5rem !important;
+    font-size: 2.5rem !important;
+    color: var(--text-primary) !important;
+    letter-spacing: -1px !important;
+}
+
+/* ===== CHARTS (Bar Chart Containers) ===== */
+.chart-container {
+    width: 100% !important;
+    height: 320px !important;
+    padding: var(--spacing-md) 0 !important;
+}
+
+.chart-legend {
+    display: flex;
+    justify-content: center;
+    gap: var(--spacing-lg);
+    margin-top: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.legend-color {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.legend-label {
+    font-size: 0.875rem !important;
+    color: var(--text-secondary) !important;
+    font-weight: 500 !important;
+}
+
+.legend-value {
+    font-weight: 800 !important;
+    color: var(--text-primary) !important;
+}
+
+/* ===== LOCATION LISTS (City/Country Progress Bars) ===== */
+.location-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.location-item {
+    margin-bottom: var(--spacing-sm);
+}
+
+.location-name {
+    font-size: 0.9375rem !important;
+    color: var(--text-primary) !important;
+    font-weight: 700 !important;
+    margin-bottom: 0.5rem !important;
+}
+
+.location-progress-container {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.location-progress-bar {
+    flex-grow: 1;
+    height: 10px;
+    background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+    border-radius: 5px;
+    overflow: hidden;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] .location-progress-bar {
+    background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
+}
+
+.location-progress-fill {
+    height: 100%;
+    background: var(--gradient-teal);
+    border-radius: 5px;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 4px rgba(0, 150, 136, 0.3);
+}
+
+.location-percentage {
+    font-size: 0.9375rem !important;
+    color: var(--text-secondary) !important;
+    font-weight: 700 !important;
+    min-width: 50px;
+    text-align: right;
+}
+
+/* ===== ICONS ===== */
+.icon-instagram {
+    color: #E91E63 !important;
+    font-size: 1.25rem !important;
+}
+
+.icon-calendar {
+    color: var(--text-secondary) !important;
+}
+
+.icon-info {
+    color: var(--text-secondary) !important;
+    font-size: 1rem !important;
+}
+
+/* ===== AVATAR ===== */
+.avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-full);
+    background: var(--gradient-primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700 !important;
+    box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
+/* ===== SPACING ===== */
+.mb-custom {
+    margin-bottom: var(--spacing-lg) !important;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .audience-container {
+        padding: var(--spacing-sm) !important;
+    }
+
+    .audience-title {
+        font-size: 1.75rem !important;
+    }
+
+    .header-section {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+
+    .header-controls {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .control-button {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .chart-container {
+        height: 250px !important;
+    }
+
+    .chart-legend {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+        align-items: flex-start;
+    }
+
+    .metric-value {
+        font-size: 2rem !important;
+    }
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.audience-card {
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes progressFill {
+    from {
+        width: 0;
+    }
+}
+
+.location-progress-fill {
+    animation: progressFill 1s ease-out;
+}
+
+/* ===== WHEN YOUR VIEWERS ARE ON INSTAGRAM — HEATMAP (larger, with microanimation) ===== */
+.audience-heatmap-section {
+    padding: 1rem 0;
+}
+
+.audience-heatmap-title {
+    font-size: 1.45rem !important;
+}
+
+.audience-heatmap-subtitle {
+    font-size: 1.05rem !important;
+}
+
+.audience-heatmap-wrapper {
+    display: flex;
+    align-items: stretch;
+    gap: 1.25rem;
+    position: relative;
+    min-height: 520px;
+}
+
+.audience-heatmap-y-labels {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    width: 4rem;
+    padding-top: 2.5rem;
+    padding-bottom: 0.5rem;
+    font-size: 1.05rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.audience-heatmap-grid {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    gap: 8px;
+}
+
+.audience-heatmap-day-col {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+
+.audience-heatmap-day-label {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.audience-heatmap-cells {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 460px;
+    gap: 5px;
+}
+
+.audience-heatmap-cell {
+    flex: 1;
+    min-height: 14px;
+    border-radius: 6px;
+    background: rgba(91, 69, 176, calc(0.15 + var(--intensity, 0) * 0.85));
+    cursor: default;
+    transition: background 0.2s ease, filter 0.2s ease;
+    will-change: transform;
+}
+
+.audience-heatmap-cell:hover {
+    filter: brightness(1.12);
+}
+
+.audience-heatmap-tooltip {
+    position: fixed;
+    z-index: 1050;
+    padding: 0.75rem 1.1rem;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    font-size: 1rem;
+    color: var(--text-primary);
+    pointer-events: none;
+    white-space: nowrap;
+}

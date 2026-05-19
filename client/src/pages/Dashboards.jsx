@@ -1308,6 +1308,7 @@ export default function AdsDashboardBootstrap() {
   const [showAdminViewDateRangeFilter, setShowAdminViewDateRangeFilter] = useState(false);
   const [adminViewAdsList, setAdminViewAdsList] = useState([]);
   const [adminViewAdsLoading, setAdminViewAdsLoading] = useState(false);
+  const [adminPhoneSearch, setAdminPhoneSearch] = useState('');
 
   // State for new filtered leads table (below Total Leads Admin View)
   const [filteredLeadsPage, setFilteredLeadsPage] = useState(null);
@@ -1333,6 +1334,7 @@ export default function AdsDashboardBootstrap() {
   const [filteredLeadsError, setFilteredLeadsError] = useState(null);
   const [filteredLeadsPageNum, setFilteredLeadsPageNum] = useState(1);
   const [filteredLeadsPerPage] = useState(10);
+  const [leadsPhoneSearch, setLeadsPhoneSearch] = useState('');
   const [filteredLeadsSelectedDateRange, setFilteredLeadsSelectedDateRange] = useState('last_7_days');
   const [showFilteredLeadsDateRangeFilter, setShowFilteredLeadsDateRangeFilter] = useState(false);
   const [downloadingFilteredLeads, setDownloadingFilteredLeads] = useState(false);
@@ -3438,10 +3440,25 @@ export default function AdsDashboardBootstrap() {
     return `${selectedAds.length} Ads Selected`;
   }, [selectedAds, ads, leadsContext]);
 
-  const totalPages = Math.max(1, Math.ceil(leadDetails.length / perPage));
+  const adminPhoneFilteredLeads = useMemo(() => {
+    if (!adminPhoneSearch.trim()) return leadDetails;
+    const q = adminPhoneSearch.trim();
+    return leadDetails.filter(lead => String(lead.Phone || lead.phone || '').includes(q));
+  }, [leadDetails, adminPhoneSearch]);
+
+  const leadsPhoneFilteredData = useMemo(() => {
+    if (!leadsPhoneSearch.trim()) return filteredLeadsData;
+    const q = leadsPhoneSearch.trim();
+    return filteredLeadsData.filter(lead => String(lead.Phone || lead.phone || '').includes(q));
+  }, [filteredLeadsData, leadsPhoneSearch]);
+
+  useEffect(() => { setPage(1); }, [adminPhoneSearch]);
+  useEffect(() => { setFilteredLeadsPageNum(1); }, [leadsPhoneSearch]);
+
+  const totalPages = Math.max(1, Math.ceil(adminPhoneFilteredLeads.length / perPage));
   const visibleLeads = useMemo(() => {
-    return leadDetails.slice((page - 1) * perPage, page * perPage);
-  }, [leadDetails, page, perPage]);
+    return adminPhoneFilteredLeads.slice((page - 1) * perPage, page * perPage);
+  }, [adminPhoneFilteredLeads, page, perPage]);
   const actionOptions = useMemo(() => {
     const set = new Set();
     data.forEach((r) => Object.keys(r.actions || {}).forEach((k) => set.add(k)));
@@ -5534,6 +5551,35 @@ export default function AdsDashboardBootstrap() {
                 </div>
               </div>
               
+              {/* Phone Number Search */}
+              <div className="mb-3">
+                <div style={{ position: 'relative', maxWidth: '280px' }}>
+                  <i className="fas fa-phone" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '0.75rem', pointerEvents: 'none' }} />
+                  <input
+                    type="text"
+                    className="form-control form-control-sm"
+                    placeholder="Search by phone number..."
+                    value={adminPhoneSearch}
+                    onChange={e => setAdminPhoneSearch(e.target.value)}
+                    style={{ paddingLeft: '30px', paddingRight: adminPhoneSearch ? '30px' : '10px', fontSize: '0.8rem', backgroundColor: 'var(--card, #ffffff)', color: 'var(--text, #1e293b)', borderColor: 'var(--border-color, #cbd5e1)' }}
+                  />
+                  {adminPhoneSearch && (
+                    <button
+                      onClick={() => setAdminPhoneSearch('')}
+                      style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px 4px' }}
+                      title="Clear search"
+                    >
+                      <i className="fas fa-times" style={{ fontSize: '0.7rem' }} />
+                    </button>
+                  )}
+                </div>
+                {adminPhoneSearch && (
+                  <small className="text-muted mt-1 d-block" style={{ fontSize: '0.72rem' }}>
+                    {adminPhoneFilteredLeads.length} result{adminPhoneFilteredLeads.length !== 1 ? 's' : ''} of {leadDetails.length} leads
+                  </small>
+                )}
+              </div>
+
               {/* Alert Message Section */}
               {leadDetails.length === 0 && !leadsLoading && (
                 <div className="alert alert-info mb-3" style={{ fontSize: '0.875rem', padding: '12px' }}>
@@ -5609,7 +5655,7 @@ export default function AdsDashboardBootstrap() {
                             ))}
                             <tr className="table-active">
                               <td colSpan="9" className="fw-bold text-center" style={{ color: '#1e293b' }}>
-                                Total Leads: {formatNum(leadDetails.length)} {totalPages > 1 && `(Page ${page} of ${totalPages})`}
+                                Total Leads: {formatNum(adminPhoneFilteredLeads.length)}{adminPhoneSearch ? ` (filtered from ${formatNum(leadDetails.length)})` : ''} {totalPages > 1 && `(Page ${page} of ${totalPages})`}
                               </td>
                             </tr>
                           </>
@@ -5668,11 +5714,11 @@ export default function AdsDashboardBootstrap() {
                   </div>
                 )}
                 {/* Pagination */}
-                {leadDetails.length > 0 && totalPages > 1 && (
+                {adminPhoneFilteredLeads.length > 0 && totalPages > 1 && (
                   <div className="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mt-3 gap-2">
                     <div>
                       <small className="text-muted">
-                        Showing {((page - 1) * perPage) + 1} to {Math.min(page * perPage, leadDetails.length)} of {leadDetails.length} leads
+                        Showing {((page - 1) * perPage) + 1} to {Math.min(page * perPage, adminPhoneFilteredLeads.length)} of {adminPhoneFilteredLeads.length} leads
                       </small>
                     </div>
                     <div className="d-flex gap-2">
@@ -5994,6 +6040,33 @@ export default function AdsDashboardBootstrap() {
                     <i className="fas fa-chevron-down ms-2"></i>
                   </button>
                 </div>
+
+                {/* Phone Number Search */}
+                <div className="col-12 col-md-auto">
+                  <label className="form-label small fw-bold text-uppercase text-muted mb-1" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>
+                    <i className="fas fa-phone me-1"></i> PHONE
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <i className="fas fa-search" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '0.7rem', pointerEvents: 'none' }} />
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      placeholder="Search phone..."
+                      value={leadsPhoneSearch}
+                      onChange={e => setLeadsPhoneSearch(e.target.value)}
+                      style={{ paddingLeft: '28px', paddingRight: leadsPhoneSearch ? '28px' : '8px', fontSize: '0.8rem', minWidth: '180px', backgroundColor: 'var(--card, #ffffff)', color: 'var(--text, #1e293b)', borderColor: 'var(--border-color, #cbd5e1)' }}
+                    />
+                    {leadsPhoneSearch && (
+                      <button
+                        onClick={() => setLeadsPhoneSearch('')}
+                        style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px 4px' }}
+                        title="Clear search"
+                      >
+                        <i className="fas fa-times" style={{ fontSize: '0.7rem' }} />
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Table Actions */}
@@ -6113,9 +6186,9 @@ export default function AdsDashboardBootstrap() {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredLeadsData.length > 0 ? (
+                        {leadsPhoneFilteredData.length > 0 ? (
                           <>
-                            {filteredLeadsData
+                            {leadsPhoneFilteredData
                               .slice((filteredLeadsPageNum - 1) * filteredLeadsPerPage, filteredLeadsPageNum * filteredLeadsPerPage)
                               .map((lead, idx) => (
                                 <tr key={lead.id || lead.lead_id || idx}>
@@ -6148,29 +6221,34 @@ export default function AdsDashboardBootstrap() {
               </div>
 
               {/* Pagination */}
-              {filteredLeadsData.length > 0 && Math.ceil(filteredLeadsData.length / filteredLeadsPerPage) > 1 && (
-                <div className="d-flex justify-content-between align-items-center mt-3">
+              {leadsPhoneFilteredData.length > 0 && (
+                <div className="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
                   <div>
                     <small className="text-muted">
-                      Showing {((filteredLeadsPageNum - 1) * filteredLeadsPerPage) + 1} to {Math.min(filteredLeadsPageNum * filteredLeadsPerPage, filteredLeadsData.length)} of {filteredLeadsData.length} leads
+                      {leadsPhoneSearch
+                        ? `${leadsPhoneFilteredData.length} result${leadsPhoneFilteredData.length !== 1 ? 's' : ''} of ${filteredLeadsData.length} leads`
+                        : `Showing ${((filteredLeadsPageNum - 1) * filteredLeadsPerPage) + 1} to ${Math.min(filteredLeadsPageNum * filteredLeadsPerPage, leadsPhoneFilteredData.length)} of ${leadsPhoneFilteredData.length} leads`
+                      }
                     </small>
                   </div>
-                  <div className="d-flex gap-2">
-                    <button
-                      className="btn btn-sm btn-outline-secondary"
-                      onClick={() => setFilteredLeadsPageNum(p => Math.max(1, p - 1))}
-                      disabled={filteredLeadsPageNum === 1}
-                    >
-                      Previous
-                    </button>
-                    <button
-                      className="btn btn-sm btn-outline-secondary"
-                      onClick={() => setFilteredLeadsPageNum(p => Math.min(Math.ceil(filteredLeadsData.length / filteredLeadsPerPage), p + 1))}
-                      disabled={filteredLeadsPageNum >= Math.ceil(filteredLeadsData.length / filteredLeadsPerPage)}
-                    >
-                      Next
-                    </button>
-                  </div>
+                  {Math.ceil(leadsPhoneFilteredData.length / filteredLeadsPerPage) > 1 && (
+                    <div className="d-flex gap-2">
+                      <button
+                        className="btn btn-sm btn-outline-secondary"
+                        onClick={() => setFilteredLeadsPageNum(p => Math.max(1, p - 1))}
+                        disabled={filteredLeadsPageNum === 1}
+                      >
+                        Previous
+                      </button>
+                      <button
+                        className="btn btn-sm btn-outline-secondary"
+                        onClick={() => setFilteredLeadsPageNum(p => Math.min(Math.ceil(leadsPhoneFilteredData.length / filteredLeadsPerPage), p + 1))}
+                        disabled={filteredLeadsPageNum >= Math.ceil(leadsPhoneFilteredData.length / filteredLeadsPerPage)}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

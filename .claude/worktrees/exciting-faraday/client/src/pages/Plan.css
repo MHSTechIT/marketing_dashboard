@@ -1,0 +1,937 @@
+/* ===========================
+   PLAN PAGE – FULL REDESIGN
+   =========================== */
+
+.plan-page {
+  min-height: 100vh;
+  background: #f1f5f9;
+}
+
+/* --- Page header (no sticky) --- */
+.plan-header {
+  background: #fff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0.75rem 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.plan-header-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+/* Header title card (image reference: bar chart icon + title + subtitle) */
+.plan-header-title-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  max-width: 100%;
+}
+
+.plan-header-title-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #22c55e 0%, #ec4899 33%, #3b82f6 66%, #eab308 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.plan-header-title-text {
+  min-width: 0;
+}
+
+.plan-page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.plan-page-subtitle {
+  font-size: 0.9rem;
+  color: #64748b;
+  margin: 0.35rem 0 0 0;
+}
+
+.plan-date-dropdown .dropdown-menu {
+  min-width: 320px;
+  padding: 1rem;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+}
+
+.plan-date-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  cursor: pointer;
+  min-width: 220px;
+  transition: border-color 0.2s;
+}
+
+.plan-date-trigger:hover {
+  border-color: #94a3b8;
+}
+
+.plan-date-icon {
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.plan-date-label {
+  flex: 1;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #334155;
+}
+
+.plan-date-chevron {
+  color: #94a3b8;
+  font-size: 0.7rem;
+}
+
+.plan-date-presets-title,
+.plan-date-field-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  margin-bottom: 0.35rem;
+  display: block;
+}
+
+.plan-date-presets-btns {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.plan-date-preset-btn {
+  flex: 1;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.plan-date-preset-btn:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.plan-date-preset-btn-active {
+  background: #eff6ff;
+  border-color: #1877f2;
+  color: #1877f2;
+}
+
+.plan-date-divider {
+  height: 1px;
+  background: #e2e8f0;
+  margin: 0.75rem 0;
+}
+
+.plan-date-custom-fields {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.plan-date-field {
+  flex: 1;
+}
+
+.plan-date-arrow {
+  color: #94a3b8;
+  padding-bottom: 0.35rem;
+}
+
+.plan-date-apply-btn {
+  width: 100%;
+  padding: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  background: #1877f2;
+  color: #fff;
+  cursor: pointer;
+}
+
+.plan-date-apply-btn:hover {
+  background: #0d5bbf;
+  color: #fff;
+}
+
+/* --- Main content wrapper --- */
+.plan-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+/* --- Shared card --- */
+.plan-card {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Webiner graphs: 2x2 grid */
+.plan-webiner-graphs-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.plan-webiner-graphs-grid .plan-webiner-graph-section {
+  margin-bottom: 0;
+}
+
+/* --- Hero (Weekly Plan) --- */
+.plan-hero-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 0.25rem 0;
+}
+
+.plan-hero-tagline {
+  color: #64748b;
+  font-size: 1rem;
+  margin: 0 0 1rem 0;
+}
+
+.plan-hero-goal {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.plan-hero-goal-text {
+  font-weight: 600;
+  color: #334155;
+  font-size: 1rem;
+}
+
+.plan-hero-goal-num {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #1877f2;
+}
+
+.plan-hero-goal-emoji {
+  font-size: 1.25rem;
+}
+
+.plan-hero-progress-wrap {
+  position: relative;
+  max-width: 100%;
+  height: 44px;
+  margin-bottom: 0.5rem;
+}
+
+.plan-hero-progress-track {
+  position: relative;
+  height: 12px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: visible;
+  top: 14px;
+}
+
+.plan-hero-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #00c853;
+  box-shadow: 0 2px 6px rgba(0, 200, 83, 0.35);
+}
+
+.plan-hero-goal-marker {
+  cursor: grab;
+  touch-action: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateX(-50%);
+}
+
+.plan-hero-marker-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #1e293b;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.plan-hero-marker-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  margin-top: 2px;
+  color: #64748b;
+}
+
+.plan-hero-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+.plan-hero-stat {
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.plan-hero-stat-done {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.plan-hero-stat-done i {
+  color: #22c55e;
+  margin-right: 0.25rem;
+}
+
+.plan-hero-stat-time {
+  background: #f1f5f9;
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+}
+
+/* Free Webiner hero: three metrics in parallel (side-by-side columns) */
+.plan-hero-metrics {
+  display: flex;
+  flex-direction: row;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.plan-hero-metric-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 200px;
+  padding: 1.25rem;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.plan-hero-metric-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #334155;
+  margin: 0;
+}
+
+.plan-hero-metric-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.plan-hero-metric-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 120px;
+  cursor: text;
+}
+
+.plan-hero-metric-field-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #64748b;
+  margin: 0;
+}
+
+/* Progress bar below the Set weekly target input */
+.plan-hero-metric-bar {
+  height: 28px;
+  margin-top: 0.25rem;
+  width: 100%;
+}
+
+.plan-hero-metric-bar .plan-hero-progress-track {
+  top: 6px;
+}
+
+.plan-hero-metric-stat {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+/* --- Team Performance section --- */
+.plan-team-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.plan-team-section-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.plan-btn-add-team {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 999px;
+  background: #1877f2;
+  color: #fff;
+  cursor: pointer;
+}
+
+.plan-btn-add-team:hover {
+  background: #0d5bbf;
+  color: #fff;
+}
+
+.plan-setup-message {
+  text-align: center;
+  padding: 2rem;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px dashed #cbd5e1;
+}
+
+.plan-setup-message-warning {
+  background: #fffbeb;
+  border-color: #fcd34d;
+}
+
+.plan-setup-message-text {
+  margin: 0 0 1rem 0;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.plan-setup-message-text code {
+  font-size: 0.85em;
+  background: #e2e8f0;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+}
+
+.plan-btn-add-team-large {
+  display: inline-block;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-radius: 999px;
+  background: #1877f2;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+.plan-btn-add-team-large:hover {
+  background: #0d5bbf;
+  color: #fff;
+}
+
+.plan-loading {
+  text-align: center;
+  padding: 2rem;
+}
+
+.plan-loading-text {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+.plan-loading-inline {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 0.5rem 0.75rem;
+  background: #f0f9ff;
+  border-radius: 8px;
+  border: 1px solid #bae6fd;
+}
+
+.plan-subsection-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  margin: 1.25rem 0 0.75rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.plan-subsection-title:first-of-type {
+  margin-top: 0;
+}
+
+.plan-weekly-trend-chart {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.plan-team-list-table-wrap,
+.plan-performance-table-wrap {
+  overflow-x: auto;
+  margin-bottom: 1.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.plan-team-list-table,
+.plan-performance-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.plan-team-list-table th,
+.plan-team-list-table td,
+.plan-performance-table th,
+.plan-performance-table td {
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.plan-team-list-table thead th,
+.plan-performance-table thead th {
+  background: #f8fafc;
+  font-weight: 600;
+  color: #334155;
+}
+
+.plan-team-list-table tbody tr:hover,
+.plan-performance-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.plan-table-actions-col {
+  white-space: nowrap;
+}
+
+.plan-table-actions-col .plan-team-card-btn {
+  margin-right: 0.25rem;
+}
+
+.plan-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.plan-team-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1rem;
+  transition: box-shadow 0.2s;
+}
+
+.plan-team-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.plan-team-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.plan-team-card-name {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 1rem;
+}
+
+.plan-team-card-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.plan-team-card-btn {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+}
+
+.plan-team-card-btn-edit {
+  color: #64748b;
+  border-color: #cbd5e1;
+}
+
+.plan-team-card-btn-edit:hover {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.plan-team-card-btn-del {
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.plan-team-card-btn-del:hover {
+  background: #fef2f2;
+}
+
+.plan-metrics-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.plan-metric-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.plan-metric-row .progress {
+  grid-column: 1 / -1;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 4px;
+}
+
+.plan-metric-row .progress-bar {
+  border-radius: 4px;
+  background: #1877f2;
+}
+
+.plan-effort-grid .plan-effort-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.plan-effort-card-name {
+  font-weight: 700;
+  color: #0f172a;
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.plan-forecast-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-top: 0.75rem;
+  padding: 1rem 0;
+  border-top: 1px solid #e2e8f0;
+}
+
+.plan-forecast-item {
+  text-align: center;
+}
+
+.plan-forecast-label {
+  display: block;
+  font-size: 0.75rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.25rem;
+}
+
+.plan-forecast-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.plan-forecast-value-primary {
+  color: #1877f2;
+}
+
+@media (max-width: 768px) {
+  .plan-forecast-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .plan-metric-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .plan-metric-row .text-muted:last-of-type {
+    grid-column: 1 / -1;
+  }
+}
+
+/* --- Tasks section --- */
+.plan-tasks-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  margin: 0 0 1rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.plan-task-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.plan-task-item {
+  list-style: none;
+}
+
+.plan-task-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: box-shadow 0.2s;
+}
+
+.plan-task-card-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+}
+
+.plan-task-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.plan-task-drag {
+  color: #94a3b8;
+  cursor: grab;
+  font-size: 1rem;
+}
+
+.plan-task-icon-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.plan-task-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #e7f3ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1877f2;
+  font-size: 1.1rem;
+  transition: background 0.2s;
+}
+
+.plan-task-card:hover .plan-task-icon {
+  background: #1877f2;
+  color: #fff;
+}
+
+.plan-task-card:hover .plan-task-icon.plan-task-icon--reel {
+  background: var(--task-icon-color, #1877f2) !important;
+  color: #fff !important;
+}
+
+.plan-task-platform {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 9px;
+}
+
+.plan-task-info {
+  min-width: 0;
+}
+
+.plan-task-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 0.15rem 0;
+}
+
+.plan-task-subtitle {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.plan-task-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+
+.plan-task-progress-wrap {
+  min-width: 100px;
+  text-align: right;
+}
+
+.plan-task-progress-text {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #334155;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.plan-task-progress-bar {
+  height: 8px;
+  background: #f1f5f9;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.plan-task-progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #1877f2 0%, #3b82f6 100%);
+  box-shadow: 0 0 8px rgba(24, 119, 242, 0.35);
+  will-change: width;
+}
+
+.plan-task-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #166534;
+  background: #dcfce7;
+  border: 1px solid #86efac;
+  border-radius: 999px;
+}
+
+.plan-task-action {
+  padding: 0.4rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1877f2;
+  border: 2px solid #1877f2;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.plan-task-action:hover {
+  background: #1877f2;
+  color: #fff;
+}
+
+.plan-footer-text {
+  text-align: center;
+  margin: 1.5rem 0 0 0;
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+/* Modal backdrop */
+.plan-modal-backdrop {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.plan-modal-backdrop .modal-content {
+  border-radius: 16px;
+  border: none;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 768px) {
+  .plan-content {
+    padding: 1rem;
+  }
+
+  .plan-task-card-inner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .plan-task-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .plan-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}

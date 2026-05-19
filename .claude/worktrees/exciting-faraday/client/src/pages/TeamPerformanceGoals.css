@@ -1,0 +1,249 @@
+/* Team Performance & Effort & Goals page */
+
+.tpg-page {
+  background-color: #f3f4f6;
+  min-height: 100vh;
+}
+
+.tpg-title {
+  font-weight: 700;
+  color: #1c1e21;
+}
+
+/* Sticky filters */
+.tpg-filters-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.tpg-filters-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+}
+
+.tpg-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 140px;
+}
+
+.tpg-filter-group label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Section */
+.tpg-section {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.tpg-section-title {
+  font-weight: 700;
+  color: #1c1e21;
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+}
+
+/* KPI cards – 2x2 grid */
+.tpg-kpi-card {
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 1rem;
+  height: 100%;
+  border: 1px solid #e2e8f0;
+  transition: box-shadow 0.2s ease;
+}
+
+.tpg-kpi-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.tpg-kpi-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.tpg-kpi-header > span {
+  font-weight: 700;
+  color: #1c1e21;
+  font-size: 0.95rem;
+}
+
+.tpg-edit-target {
+  font-size: 0.75rem;
+  color: #1877f2;
+  text-decoration: none;
+}
+
+.tpg-edit-target:hover {
+  text-decoration: underline;
+  color: #0d5bbf;
+}
+
+.tpg-kpi-target,
+.tpg-kpi-achieved,
+.tpg-kpi-remaining {
+  font-size: 0.85rem;
+  color: #475569;
+  margin-bottom: 0.25rem;
+}
+
+.tpg-kpi-achieved {
+  color: #1877f2;
+  font-weight: 600;
+}
+
+.tpg-progress {
+  height: 8px;
+  border-radius: 4px;
+  background-color: #e2e8f0;
+  margin-top: 0.5rem;
+  overflow: hidden;
+}
+
+.tpg-progress .progress-bar {
+  transition: width 0.5s ease;
+  background: linear-gradient(90deg, #1877f2, #0ea5e9);
+}
+
+.tpg-kpi-pct {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #64748b;
+  margin-top: 0.25rem;
+}
+
+/* Circular progress – Effort & Goals */
+.tpg-effort-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.tpg-circular-progress {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.tpg-circle-bg {
+  stroke: #e2e8f0;
+}
+
+.tpg-circle-fill {
+  transition: stroke-dasharray 0.5s ease;
+}
+
+.tpg-circular-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+.tpg-circular-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #1c1e21;
+}
+
+.tpg-circular-pct {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.tpg-circular-name {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+
+/* Forecast cards */
+.tpg-forecast-card {
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+  text-align: center;
+}
+
+.tpg-forecast-label {
+  font-size: 0.75rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.25rem;
+}
+
+.tpg-forecast-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1c1e21;
+}
+
+/* Chart cards */
+.tpg-chart-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+  height: 100%;
+}
+
+.tpg-chart-title {
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+
+/* Modal */
+.tpg-modal-backdrop {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+@media (max-width: 768px) {
+  .tpg-filters-inner {
+    flex-direction: column;
+  }
+
+  .tpg-filter-group {
+    min-width: 100%;
+  }
+
+  .tpg-effort-row {
+    justify-content: center;
+  }
+
+  .tpg-kpi-card {
+    min-height: 140px;
+  }
+}

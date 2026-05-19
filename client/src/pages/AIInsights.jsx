@@ -1356,8 +1356,15 @@ export default function AIInsights() {
                     if (res.status === 429) {
                         setError('AI quota exceeded. Showing last analysis below.');
                         setQuotaRetrySeconds(typeof json.retryAfterSeconds === 'number' ? json.retryAfterSeconds : 60);
+                    } else if (res.status === 402 || json.error === 'billing_error') {
+                        setError('BILLING_ERROR');
                     } else {
-                        setError(json.details || json.error || res.statusText || 'Failed to load AI insights');
+                        // Strip raw JSON if it leaked into the message
+                        const raw = json.details || json.error || res.statusText || 'Failed to load AI insights';
+                        const clean = typeof raw === 'string' && raw.trimStart().startsWith('{')
+                            ? 'AI service error. Please try again later.'
+                            : raw;
+                        setError(clean);
                     }
                 }
                 return;
@@ -2221,23 +2228,33 @@ export default function AIInsights() {
             )}
 
             {error && !loading && (
-                <div className="ai2-banner ai2-banner-error">
-                    <i className="fas fa-exclamation-triangle" />
-                    <span>
-                        {error}
-                        {quotaRetrySeconds != null && quotaRetrySeconds > 0 && (
-                            <span> Retry in {quotaRetrySeconds}s.</span>
-                        )}
-                    </span>
-                    <button
-                        type="button"
-                        className="ai2-btn-ghost"
-                        onClick={() => fetchAIInsights(false)}
-                        disabled={quotaRetrySeconds != null && quotaRetrySeconds > 0}
-                    >
-                        Retry
-                    </button>
-                </div>
+                error === 'BILLING_ERROR' ? (
+                    <div className="ai2-banner" style={{ backgroundColor: '#fff7ed', borderColor: '#fdba74', color: '#92400e', display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px 20px', borderRadius: '10px', border: '1px solid #fdba74', marginBottom: '16px' }}>
+                        <i className="fas fa-exclamation-circle" style={{ fontSize: '1.2rem', marginTop: '2px', color: '#f97316' }} />
+                        <div style={{ flex: 1 }}>
+                            <strong style={{ display: 'block', marginBottom: '4px', fontSize: '0.95rem' }}>Google Gemini API — Quota Exceeded</strong>
+                            <span style={{ fontSize: '0.85rem' }}>The Gemini API quota has been reached. Please check your Google AI Studio quota or try again later.</span>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="ai2-banner ai2-banner-error">
+                        <i className="fas fa-exclamation-triangle" />
+                        <span>
+                            {error}
+                            {quotaRetrySeconds != null && quotaRetrySeconds > 0 && (
+                                <span> Retry in {quotaRetrySeconds}s.</span>
+                            )}
+                        </span>
+                        <button
+                            type="button"
+                            className="ai2-btn-ghost"
+                            onClick={() => fetchAIInsights(false)}
+                            disabled={quotaRetrySeconds != null && quotaRetrySeconds > 0}
+                        >
+                            Retry
+                        </button>
+                    </div>
+                )
             )}
 
             <div className="ai2-grid-2">

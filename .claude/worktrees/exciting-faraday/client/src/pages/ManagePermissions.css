@@ -1,0 +1,232 @@
+/* Manage Permissions Page Styles */
+
+.manage-permissions-container {
+  padding: 24px;
+  background-color: var(--bg, #f5f7fa);
+  min-height: 100vh;
+  padding-bottom: 100px; /* Space for sticky footer */
+  position: relative;
+}
+
+/* Header Section */
+.permissions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.permissions-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text, #1a1d1f);
+  margin: 0;
+}
+
+.btn-back {
+  background-color: #64748b;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-back:hover {
+  background-color: #475569;
+}
+
+/* Content Section */
+.permissions-content {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* Permission Section */
+.permission-section {
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.permission-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.permission-section-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text, #1a1d1f);
+  margin: 0 0 16px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Permission Item */
+.permission-item {
+  margin-bottom: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.permission-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.permission-item-child {
+  padding-left: 24px;
+  position: relative;
+}
+
+.permission-item-child::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: #e2e8f0;
+}
+
+/* Loading Spinner */
+.loading-spinner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  font-size: 1.1rem;
+  color: var(--text, #64748b);
+}
+
+/* Sticky Footer */
+.permissions-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  padding: 16px 24px;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+  z-index: 100;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-save-permissions {
+  background-color: #4f46e5;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 32px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 120px;
+}
+
+.btn-save-permissions:hover:not(:disabled) {
+  background-color: #4338ca;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+
+.btn-save-permissions:disabled {
+  background-color: #94a3b8;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .manage-permissions-container {
+    padding: 16px;
+    padding-bottom: 100px;
+  }
+
+  .permissions-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .permissions-content {
+    padding: 16px;
+  }
+
+  .permission-section-title {
+    font-size: 1rem;
+  }
+
+  .permission-item-child {
+    padding-left: 16px;
+  }
+
+  .permissions-footer {
+    padding: 12px 16px;
+  }
+
+  .btn-save-permissions {
+    padding: 10px 24px;
+    font-size: 0.95rem;
+    width: 100%;
+  }
+}
+
+/* Dark Theme Support */
+[data-theme="dark"] .manage-permissions-container {
+  background-color: var(--bg, #0f172a);
+}
+
+[data-theme="dark"] .permissions-title {
+  color: var(--text, #f1f5f9);
+}
+
+[data-theme="dark"] .permissions-content {
+  background-color: var(--card, #1e293b);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .permission-section {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .permission-section-title {
+  color: var(--text, #f1f5f9);
+}
+
+[data-theme="dark"] .permission-item {
+  border-bottom-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .permission-item-child::before {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .permissions-footer {
+  background-color: var(--card, #1e293b);
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .btn-back {
+  background-color: #475569;
+}
+
+[data-theme="dark"] .btn-back:hover {
+  background-color: #334155;
+}

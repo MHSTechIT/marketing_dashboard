@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hook Rate &amp; Hold Rate — Methodology Report</title>
+  <style>
+    :root { --text: #1e293b; --muted: #64748b; --border: #e2e8f0; }
+    body { font-family: system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height: 1.55; color: var(--text); max-width: 48rem; margin: 2rem auto; padding: 0 1.25rem; }
+    h1 { font-size: 1.65rem; border-bottom: 2px solid var(--border); padding-bottom: 0.5rem; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; }
+    h3 { font-size: 1.05rem; margin-top: 1.25rem; }
+    table { border-collapse: collapse; width: 100%; font-size: 0.92rem; margin: 1rem 0; }
+    th, td { border: 1px solid var(--border); padding: 0.45rem 0.6rem; text-align: left; vertical-align: top; }
+    th { background: #f8fafc; }
+    code { background: #f1f5f9; padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.9em; }
+    .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+    .formula { background: #f8fafc; border-left: 4px solid #0ea5e9; padding: 0.75rem 1rem; margin: 1rem 0; overflow-x: auto; }
+    @media print { body { margin: 0; max-width: none; } }
+  </style>
+</head>
+<body>
+  <h1>Ads Analytics Dashboard — Hook Rate &amp; Hold Rate Methodology</h1>
+  <p class="meta"><strong>Document version:</strong> 1.0 · <strong>Last updated:</strong> March 2026 · Marketing Dashboard (<code>Dashboards.jsx</code> + Meta Insights)</p>
+
+  <h2>1. Data source and scope</h2>
+  <table>
+    <tr><th>Aspect</th><th>Detail</th></tr>
+    <tr><td>API</td><td>Meta Marketing API — <strong>Ad Insights</strong> (<code>GET /act_{ad_account_id}/insights</code>)</td></tr>
+    <tr><td>Level</td><td><strong>Ad</strong> (typically one row per ad per day when <code>time_increment=1</code>)</td></tr>
+    <tr><td>Refresh</td><td>Database and/or <strong>live</strong> Meta (“Refresh with live data”)</td></tr>
+    <tr><td>Aggregation</td><td>KPIs use <strong>ratio of totals</strong> over all filtered insight rows (not an average of daily percentages)</td></tr>
+  </table>
+
+  <h2>2. Hook Rate</h2>
+  <h3>2.1 UI description</h3>
+  <p>The card subtitle is: <em>3s views ÷ impressions · else plays ÷ impressions</em> — three-second views are preferred; if Meta returns no 3-second volume for the aggregate, the app uses <strong>video plays ÷ impressions</strong>.</p>
+
+  <h3>2.2 Formula (KPI totals)</h3>
+  <p>Let <em>I</em> = sum of impressions, <em>V<sub>3s</sub></em> = sum of 3-second video views, <em>P</em> = sum of video plays.</p>
+  <div class="formula">
+    <strong>Hook Rate (%)</strong> =<br />
+    • If <em>V<sub>3s</sub></em> &gt; 0: <code>(V<sub>3s</sub> / I) × 100</code><br />
+    • Else if <em>P</em> &gt; 0: <code>(P / I) × 100</code><br />
+    • Else: <code>0</code> &nbsp;(also if <em>I</em> = 0)
+  </div>
+  <p><strong>Meta fields (typical):</strong> <code>video_3_sec_watched_actions</code> (often top-level on the insight row), plus fallbacks in <code>actions</code>; plays from <code>video_play_actions</code> / <code>video_play</code> / <code>video_view</code>.</p>
+
+  <h3>2.3 Example — Hook Rate 94.83% (e.g. ad “Ladu”, ~215,096 impressions)</h3>
+  <p>If the <strong>3-second path</strong> is active: <code>0.9483 ≈ V<sub>3s</sub> / 215,096</code> → <strong>V<sub>3s</sub> ≈ 203,900</strong> (order-of-magnitude check).</p>
+  <p>If only the <strong>plays fallback</strong> were used (V<sub>3s</sub> = 0), the same percentage would mean plays are a similar fraction of impressions — verify in Meta which metrics are non-zero for that ad and date range.</p>
+
+  <h2>3. Hold Rate</h2>
+  <p>The UI may say “100% Watched / Video Play”; the <strong>implemented KPI</strong> uses a <strong>priority cascade</strong> (see code). Summed inputs include 3-second views, p50/p75 watched, ThruPlay, 100% watched, plays, and video views.</p>
+
+  <h3>3.1 Hold numerator <em>H</em> (first positive wins)</h3>
+  <ol>
+    <li><code>video_p50_watched_actions</code> if &gt; 0</li>
+    <li>Else <code>video_p75_watched_actions</code> if &gt; 0</li>
+    <li>Else <code>video_thruplay_watched_actions</code> if &gt; 0</li>
+    <li>Else 100% / completion count</li>
+  </ol>
+
+  <h3>3.2 KPI cascade</h3>
+  <div class="formula">
+    <strong>1)</strong> If <em>V<sub>3s</sub></em> &gt; 0 and <em>H</em> &gt; 0: &nbsp; <code>Hold Rate = (H / V<sub>3s</sub>) × 100</code><br /><br />
+    <strong>2)</strong> Else if plays &gt; 0 and P100 &gt; 0: &nbsp; <code>Hold Rate = (P100 / plays) × 100</code><br /><br />
+    <strong>3)</strong> Further fallbacks (ThruPlay vs plays, etc.) — see <code>aggregateHoldRatePct</code> in the codebase.
+  </div>
+
+  <h3>3.3 Example — Hold Rate 1.08%</h3>
+  <p>If branch (1) applies: <code>0.0108 ≈ H / V<sub>3s</sub></code>, so <em>H</em> is about 1.08% of <em>V<sub>3s</sub></em> — a small share of 3-second viewers reaching the milestone used as <em>H</em>. If branch (2) applies, interpret as ~1.08% of plays with 100% watched.</p>
+
+  <h2>4. Filters</h2>
+  <p>Selections for ad account, campaign, and ad name restrict which insight rows are summed. Hook and Hold always match the <strong>current filter scope</strong> and date range.</p>
+
+  <h2>5. Code references</h2>
+  <ul>
+    <li><code>client/src/pages/Dashboards.jsx</code> — <code>aggregateHookRatePct</code>, <code>aggregateHoldRatePct</code>, <code>totals</code> memo</li>
+    <li><code>server/meta/insightsService.js</code> — <code>enrichInsightsRow</code>, insights <code>fields</code></li>
+  </ul>
+
+  <h2>6. Disclaimer</h2>
+  <p>Meta’s metric definitions depend on placement, attribution, and API version. This report describes <strong>this application’s</strong> formulas. Validate with exported Ad Insights for the same <code>ad_id</code> and dates if you need an audit trail.</p>
+
+  <hr style="margin: 2rem 0; border: none; border-top: 1px solid var(--border);" />
+  <p class="meta"><strong>Download / PDF:</strong> Use your browser menu → Print → Save as PDF, or save this HTML file from the project <code>docs/</code> folder.</p>
+</body>
+</html>

@@ -1,0 +1,12 @@
+body.bg-dark {
+    color: white;
+  }
+  
+  body.bg-light {
+    color: black;
+  }
+  
+  main {
+    transition: background-color 0.3s, color 0.3s;
+  }
+  

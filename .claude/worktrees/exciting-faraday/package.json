@@ -1,0 +1,17 @@
+{
+  "name": "marketing-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "cd client && npm install && cross-env CI=false DISABLE_ESLINT_PLUGIN=true npm run build",
+    "claude": "node ./claude.js"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
+    "dotenv": "^16.4.5"
+  }
+}

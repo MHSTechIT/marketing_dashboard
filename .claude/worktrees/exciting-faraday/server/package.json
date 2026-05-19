@@ -1,0 +1,36 @@
+{
+  "name": "ads-dashboard-server",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "build": "cd ../client && npm install && cross-env CI=false DISABLE_ESLINT_PLUGIN=true npm run build",
+    "prestart": "node -e \"const net=require('net');const s=net.createServer();s.once('error',()=>{const{execSync}=require('child_process');try{const r=execSync('netstat -ano').toString().split('\\n').filter(l=>l.includes(':4000')&&l.includes('LISTENING'));r.forEach(l=>{const p=l.trim().split(/\\s+/).pop();if(p&&/^\\d+$/.test(p))try{execSync('taskkill /PID '+p+' /F')}catch(e){}});console.log('[prestart] Freed port 4000')}catch(e){}});s.once('listening',()=>{s.close()});s.listen(4000)\"",
+    "start": "nodemon --ext js,jsx,json server.js",
+    "seed": "node seed.js",
+    "verify-supabase": "node verify-supabase.js",
+    "check-users-table": "node check-users-table.js",
+    "fix-schema-cache": "node fix-schema-cache.js",
+    "migrate-supabase": "node migrate-to-supabase.js",
+    "migrate-supabase:data": "node migrate-to-supabase.js --migrate-data",
+    "import-users": "node import-users-supabase.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.90.1",
+    "axios": "^1.13.2",
+    "bcrypt": "^5.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.1",
+    "jsonwebtoken": "^9.0.0"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "nodemon": "^3.1.11"
+  },
+  "optionalDependencies": {
+    "redis": "^4.6.0"
+  },
+  "overrides": {
+    "tar": "^7.5.7"
+  }
+}

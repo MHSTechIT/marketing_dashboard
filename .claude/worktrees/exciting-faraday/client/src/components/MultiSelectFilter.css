@@ -1,0 +1,328 @@
+.multi-select-filter-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.multi-select-dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.multi-select-button {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background-color: white;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+  color: #1e293b;
+  min-height: 42px;
+}
+
+.multi-select-button:hover:not(.disabled) {
+  border-color: #94a3b8;
+}
+
+.multi-select-button.open {
+  border-color: #4F46E5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.multi-select-button.disabled {
+  background-color: #f1f5f9;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.multi-select-button-text {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  color: #1e293b;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.multi-select-arrow {
+  color: #64748b;
+  font-size: 0.75rem;
+  transition: transform 0.2s ease;
+  opacity: 0.5;
+}
+
+.multi-select-arrow.rotated {
+  transform: rotate(180deg);
+}
+
+.multi-select-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: auto;
+  width: 100%;
+  max-width: min(320px, calc(100vw - 24px));
+  background-color: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  overflow: hidden;
+  min-width: 250px;
+  animation: multi-select-menu-in 0.2s ease-out;
+}
+
+/* Portaled menu: position set by JS (fixed); prevents dropdown shift when parent reflows */
+.multi-select-dropdown-menu-portal {
+  position: fixed;
+  z-index: 1050;
+}
+
+/* Open upward when near bottom of viewport */
+.multi-select-dropdown-menu.open-above {
+  top: auto;
+  bottom: calc(100% + 8px);
+  animation: multi-select-menu-in-above 0.2s ease-out;
+}
+
+@keyframes multi-select-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes multi-select-menu-in-above {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.multi-select-search {
+  position: relative;
+  padding: 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.multi-select-search-icon {
+  position: absolute;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  font-size: 0.875rem;
+}
+
+.multi-select-search-input {
+  width: 100%;
+  padding: 8px 12px 8px 36px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: #1e293b;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.multi-select-search-input:focus {
+  border-color: #4F46E5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.multi-select-options {
+  max-height: min(300px, 50vh);
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.multi-select-options::-webkit-scrollbar {
+  width: 6px;
+}
+
+.multi-select-options::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.multi-select-options::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.multi-select-options::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.multi-select-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.multi-select-item:hover {
+  background-color: #f8fafc;
+}
+
+.multi-select-item.selected {
+  background-color: #eff6ff;
+}
+
+/* Active campaigns/ads: green highlight at top of list */
+.multi-select-item.multi-select-item-active {
+  background-color: #dcfce7;
+}
+
+.multi-select-item.multi-select-item-active:hover {
+  background-color: #bbf7d0;
+}
+
+.multi-select-item.multi-select-item-active.selected {
+  background-color: #bbf7d0;
+}
+
+.multi-select-item-all {
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.multi-select-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  width: 100%;
+  margin: 0;
+}
+
+.multi-select-checkbox-label input[type="checkbox"],
+.multi-select-checkbox-label input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #4F46E5;
+  flex-shrink: 0;
+}
+
+.multi-select-status-dot {
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-right: 8px;
+}
+
+.multi-select-checkbox-text {
+  flex: 1;
+  font-size: 0.875rem;
+  color: #1e293b;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.multi-select-status-label {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.multi-select-no-results {
+  padding: 16px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.875rem;
+}
+
+/* Dark theme support */
+[data-theme="dark"] .multi-select-button {
+  background-color: #1e293b;
+  border-color: #334155;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .multi-select-button:hover:not(.disabled) {
+  border-color: #475569;
+}
+
+[data-theme="dark"] .multi-select-button.disabled {
+  background-color: #0f172a;
+  opacity: 0.5;
+}
+
+[data-theme="dark"] .multi-select-button-text {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .multi-select-dropdown-menu {
+  background-color: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .multi-select-search {
+  border-bottom-color: #334155;
+}
+
+[data-theme="dark"] .multi-select-search-input {
+  background-color: #0f172a;
+  border-color: #334155;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .multi-select-search-input:focus {
+  border-color: #4F46E5;
+}
+
+[data-theme="dark"] .multi-select-item:hover {
+  background-color: #0f172a;
+}
+
+[data-theme="dark"] .multi-select-item.selected {
+  background-color: #1e3a5f;
+}
+
+[data-theme="dark"] .multi-select-item.multi-select-item-active {
+  background-color: #14532d;
+}
+
+[data-theme="dark"] .multi-select-item.multi-select-item-active:hover {
+  background-color: #166534;
+}
+
+[data-theme="dark"] .multi-select-item.multi-select-item-active.selected {
+  background-color: #166534;
+}
+
+[data-theme="dark"] .multi-select-item-all {
+  border-bottom-color: #334155;
+}
+
+[data-theme="dark"] .multi-select-checkbox-text {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .multi-select-status-label {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .multi-select-no-results {
+  color: #64748b;
+}

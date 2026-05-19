@@ -1,0 +1,871 @@
+[LeadsSync] Scheduler started — 3 forms, every 5 min
+(node:30340) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Port 4000 in use — retrying in 2s... (3 attempts left)
+[LeadsSync] Form 2449233332261397 (NSI - Direct Walkin - Conditional Logic) — fetching since: 2026-05-19T02:24:19+0000
+[LeadsSync] Form 2449233332261397 — no new leads
+[LeadsSync] Form 818636004640541 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T03:46:17+0000
+Port 4000 in use — retrying in 2s... (2 attempts left)
+[LeadsSync] Form 818636004640541 — no new leads
+[LeadsSync] Form 968880282530796 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T01:54:43+0000
+[LeadsSync] Form 968880282530796 — no new leads
+[LeadsSync] Sync complete — total pushed this run: 0
+Port 4000 in use — retrying in 2s... (1 attempts left)
+Server listening on port 4000
+[LeadsSync] Scheduler started — syncing 4 page(s) every 15 min: 113830624877941, 919735281228628, 355327027658692, 332255769969394
+[StorySnapshotsSync] Scheduler started (every 6h) for page(s): 113830624877941, 919735281228628, 355327027658692, 332255769969394
+[AutoDeleteLeads] Scheduler started — runs every 24 hours
+[DWSync] Scheduler started — every 2 min.
+[DWSync] Starting sync…
+[DWSync] Fetching DW campaign IDs from Meta…
+[LeadsSync] No previous sync record. Backfilling last 7 days.
+[LeadsSync] Syncing page 113830624877941: 2026-05-12T03:48:46.191Z → 2026-05-19T03:48:46.191Z
+[DWSync] Account 384231607347196: 111 campaign IDs so far
+[fetchAllAdAccountIds] Fetched 62 ad accounts from Meta API (1 page(s))
+[fetchAllAdAccountIds] Accounts: MHS Ad Account 2025  (Read-Only) (1308491553874548), My Health School (Read-Only) (674301275617033), My Health School (Read-Only) (1539407094034141), My Health School (Read-Only) (1925007714810225), My Health School (Read-Only) (1296097642584236), MHS 2025 (1538719834059161), MHS Dental Care (Read-Only) (1604314490910814), Direct Walkin 2026 (1732096027755048), Integfarms (705155253819861), My Health School (Current) (530615489114338), Old Account MHS (1739044856595087), MHS Ad Account (2024) (384231607347196), My Health School - Test Account (1118966742784490), Gayathri R (950422053151053), MHS Integfarms-2 (986663466448607), MHS S-2 (332450076623103), MHS Integfarms-1 (1693523178051861), MHS S-1 (1165675118015737), MHS Dental Care (327236376911765), Integfarms My Health School Private Limited (Read-Only) (1895689934526774), Integfarms My Health School Private Limited (Read-Only) (582803158171493), Doctor Farmer MHS (Read-Only) (503412109433387), Doctor Farmer (Read-Only) (1354906932232055), NEW MHS 01 (1016470376862563), My Health School (Read-Only) (1060742598918234), MHS - Doctor Farmer (Read-Only) (1049228324014887), My Health School - GB (Read-Only) (703182482654845), Doctor Farmer MHS (Read-Only) (1512710456385560), Integfarms MHS 01 (1421944619002441), Doctor Farmer (Read-Only) (1405950350701165), MHS - Doctor Farmer (Read-Only) (1080027194035334), Doctor Farmer (Read-Only) (1310409591089555), MHS - Doctor Farmer (Read-Only) (1456801645748908), Doctor Farmer MHS (Read-Only) (1086248866973644), Doctor Farmer (Read-Only) (1098419872240893), My Health School (Read-Only) (770500352042994), My Health School (Read-Only) (1237451050925712), My Health School 2025 (1088771750122808), My Health School (Read-Only) (1096911542533142), My Health School (Read-Only) (2575731159469988), MHS Ad Account 2025  (Read-Only) (2642835622725593), My Health School 2025 (Read-Only) (1475893974143238), MHS Ad Account 2025  (Read-Only) (1503251064631745), My Health School (Read-Only) (2549288575444083), My Health School (Read-Only) (844712348524587), My Health School (Read-Only) (679745958109107), Integfarm MHS 02 (1398296668512853), My Health School (Read-Only) (1131102628838211), MHS Ad Account 2025  (Read-Only) (1966869560541483), Integfarms 01 (1990711071494666), My Health School 2025 (Read-Only) (1287748163109477), My Health School (Read-Only) (822850357222574), Test WhatsApp Business Account (Read-Only) (738495419197107), My Health School (Read-Only) (1242377951142197), My Health School (Read-Only) (744271878694046), Integfarms 02 (1512093733230882), True Food Store Doctor Farmer (Read-Only) (947521991096813), My Health School (Read-Only) (1937678256835970), My Health School (Read-Only) (1911157109808357), New MHS 02 (2183252375757070), MHS DF 01 (1795178471390515), Whats App (Read-Only) (1237278111897840)
+[InsightsSync] Found 62 ad accounts to sync
+[InsightsSync] Starting sync for 62 accounts, date range: 2026-05-19..2026-05-19
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: 'Error validating access token: Session has expired on Wednesday, 13-May-26 23:00:00 PDT. The current time is Monday, 18-May-26 20:48:46 PDT.',
+    type: 'OAuthException',
+    code: 190,
+    error_subcode: 463,
+    fbtrace_id: 'ADz_nY2SshZxBrHl-GRNoBr'
+  }
+}
+[LeadsSync] Error syncing page 113830624877941: Request failed with status code 401
+[LeadsSync] Syncing page 919735281228628: 2026-05-12T03:48:46.191Z → 2026-05-19T03:48:46.191Z
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[InsightsSync] - MHS Ad Account 2025  (Read-Only) (1308491553874548): no new data for 2026-05-19..2026-05-19
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: '(#190) This method must be called with a Page Access Token',
+    type: 'OAuthException',
+    code: 190,
+    fbtrace_id: 'AfQ3YvKglu_IBCC65DZRQK1'
+  }
+}
+[LeadsSync] Error syncing page 919735281228628: Request failed with status code 400
+[LeadsSync] Syncing page 355327027658692: 2026-05-12T03:48:46.191Z → 2026-05-19T03:48:46.191Z
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: '(#190) This method must be called with a Page Access Token',
+    type: 'OAuthException',
+    code: 190,
+    fbtrace_id: 'AXCWvsnUxcaTtStsiuU7E2A'
+  }
+}
+[LeadsSync] Error syncing page 355327027658692: Request failed with status code 400
+[LeadsSync] Syncing page 332255769969394: 2026-05-12T03:48:46.191Z → 2026-05-19T03:48:46.191Z
+[InsightsSync] - My Health School (Read-Only) (674301275617033): no new data for 2026-05-19..2026-05-19
+[LeadsSync] Could not fetch page token via Graph for page 332255769969394: (#10) This endpoint requires the 'pages_read_engagement' permission or the 'Page Public Content Access' feature or the 'Page Public Metadata Access' feature. Refer to https://developers.facebook.com/docs/apps/review/login-permissions#manage-pages, https://developers.facebook.com/docs/apps/review/feature#reference-PAGES_ACCESS and https://developers.facebook.com/docs/apps/review/feature#page-public-metadata-access for details.
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: '(#190) This method must be called with a Page Access Token',
+    type: 'OAuthException',
+    code: 190,
+    fbtrace_id: 'ACCamAW9Md14DsMF-SCbwCw'
+  }
+}
+[LeadsSync] Error syncing page 332255769969394: Request failed with status code 400
+[LeadsSync] One or more pages failed — JobState cursor NOT advanced. Will retry on next run.
+[DWSync] Account 1795178471390515: 114 campaign IDs so far
+[InsightsSync] - My Health School (Read-Only) (1539407094034141): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (1925007714810225): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (1296097642584236): no new data for 2026-05-19..2026-05-19
+[DWSync] DW campaign IDs: 114
+[InsightsSync] ✓ MHS 2025 (1538719834059161): 6 rows for 2026-05-19..2026-05-19
+[DWSync] Lead-gen forms on page: 143
+[InsightsSync] - MHS Dental Care (Read-Only) (1604314490910814): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Direct Walkin 2026 (1732096027755048): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Integfarms (705155253819861): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Current) (530615489114338): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Old Account MHS (1739044856595087): no new data for 2026-05-19..2026-05-19
+[InsightsSync] ✓ MHS Ad Account (2024) (384231607347196): 40 rows for 2026-05-19..2026-05-19
+[InsightsSync] ✓ My Health School - Test Account (1118966742784490): 37 rows for 2026-05-19..2026-05-19
+[InsightsSync] - Gayathri R (950422053151053): no new data for 2026-05-19..2026-05-19
+[InsightsSync] ✓ MHS Integfarms-2 (986663466448607): 13 rows for 2026-05-19..2026-05-19
+[InsightsSync] ✓ MHS S-2 (332450076623103): 6 rows for 2026-05-19..2026-05-19
+[InsightsSync] ✓ MHS Integfarms-1 (1693523178051861): 10 rows for 2026-05-19..2026-05-19
+[InsightsSync] ✓ MHS S-1 (1165675118015737): 18 rows for 2026-05-19..2026-05-19
+[InsightsSync] - MHS Dental Care (327236376911765): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Integfarms My Health School Private Limited (Read-Only) (1895689934526774): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Integfarms My Health School Private Limited (Read-Only) (582803158171493): no new data for 2026-05-19..2026-05-19
+[Instagram Insights] instagram_accounts edge failed for page 113830624877941: Error validating access token: Session has expired on Wednesday, 13-May-26 23:00:00 PDT. The current time is Monday, 18-May-26 20:49:16 PDT.
+[Instagram Insights] instagram_accounts edge failed for page 919735281228628: Error validating access token: Session has expired on Wednesday, 13-May-26 23:00:00 PDT. The current time is Monday, 18-May-26 20:49:16 PDT.
+[Instagram Insights] instagram_accounts edge failed for page 355327027658692: Error validating access token: Session has expired on Wednesday, 13-May-26 23:00:00 PDT. The current time is Monday, 18-May-26 20:49:17 PDT.
+[InsightsSync] - Doctor Farmer MHS (Read-Only) (503412109433387): no new data for 2026-05-19..2026-05-19
+[Instagram Insights] instagram_accounts edge failed for page 332255769969394: Error validating access token: Session has expired on Wednesday, 13-May-26 23:00:00 PDT. The current time is Monday, 18-May-26 20:49:17 PDT.
+[InsightsSync] - Doctor Farmer (Read-Only) (1354906932232055): no new data for 2026-05-19..2026-05-19
+[InsightsSync] ✓ NEW MHS 01 (1016470376862563): 9 rows for 2026-05-19..2026-05-19
+[Instagram Media Insights] Graph API error: {
+  code: 190,
+  message: 'Error validating access token: Session has expired on Wednesday, 13-May-26 23:00:00 PDT. The current time is Monday, 18-May-26 20:49:19 PDT.'
+}
+[Instagram Media Insights] Graph API error: {
+  code: 190,
+  message: 'Error validating access token: Session has expired on Wednesday, 13-May-26 23:00:00 PDT. The current time is Monday, 18-May-26 20:49:20 PDT.'
+}
+[InsightsSync] - My Health School (Read-Only) (1060742598918234): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - MHS - Doctor Farmer (Read-Only) (1049228324014887): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School - GB (Read-Only) (703182482654845): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Doctor Farmer MHS (Read-Only) (1512710456385560): no new data for 2026-05-19..2026-05-19
+[InsightsSync] ✓ Integfarms MHS 01 (1421944619002441): 24 rows for 2026-05-19..2026-05-19
+[InsightsSync] - Doctor Farmer (Read-Only) (1405950350701165): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - MHS - Doctor Farmer (Read-Only) (1080027194035334): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Doctor Farmer (Read-Only) (1310409591089555): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - MHS - Doctor Farmer (Read-Only) (1456801645748908): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Doctor Farmer MHS (Read-Only) (1086248866973644): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Doctor Farmer (Read-Only) (1098419872240893): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (770500352042994): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (1237451050925712): no new data for 2026-05-19..2026-05-19
+[InsightsSync] ✓ My Health School 2025 (1088771750122808): 9 rows for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (1096911542533142): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (2575731159469988): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - MHS Ad Account 2025  (Read-Only) (2642835622725593): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School 2025 (Read-Only) (1475893974143238): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - MHS Ad Account 2025  (Read-Only) (1503251064631745): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (2549288575444083): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (844712348524587): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (679745958109107): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Integfarm MHS 02 (1398296668512853): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (1131102628838211): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - MHS Ad Account 2025  (Read-Only) (1966869560541483): no new data for 2026-05-19..2026-05-19
+[InsightsSync] ✓ Integfarms 01 (1990711071494666): 18 rows for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School 2025 (Read-Only) (1287748163109477): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (822850357222574): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Test WhatsApp Business Account (Read-Only) (738495419197107): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (1242377951142197): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (744271878694046): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Integfarms 02 (1512093733230882): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - True Food Store Doctor Farmer (Read-Only) (947521991096813): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (1937678256835970): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (1911157109808357): no new data for 2026-05-19..2026-05-19
+[InsightsSync] ✓ New MHS 02 (2183252375757070): 19 rows for 2026-05-19..2026-05-19
+[InsightsSync] ✓ MHS DF 01 (1795178471390515): 10 rows for 2026-05-19..2026-05-19
+[InsightsSync] - Whats App (Read-Only) (1237278111897840): no new data for 2026-05-19..2026-05-19
+[InsightsSync] Completed: 62 accounts processed, total 219 rows synced for 2026-05-19..2026-05-19
+[DWSync] Already running — skipping.
+[DWSync] Already running — skipping.
+[LeadsSync] Form 2449233332261397 (NSI - Direct Walkin - Conditional Logic) — fetching since: 2026-05-19T02:24:19+0000
+[LeadsSync] Form 2449233332261397 — no new leads
+[LeadsSync] Form 818636004640541 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T03:52:38+0000
+[LeadsSync] Form 818636004640541 — no new leads
+[LeadsSync] Form 968880282530796 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T01:54:43+0000
+[LeadsSync] Form 968880282530796 — no new leads
+[LeadsSync] Sync complete — total pushed this run: 0
+[DWSync] Already running — skipping.
+[DWSync] Scanned 45229 total leads — 693 new DW leads to push.
+[DWSync] Sync error: Unable to parse range: DW LEADS FROM MKT SW!A1
+[DWSync] Starting sync…
+[DWSync] Fetching DW campaign IDs from Meta…
+[DWSync] Account 384231607347196: 111 campaign IDs so far
+[DWSync] Account 1795178471390515: 114 campaign IDs so far
+[DWSync] DW campaign IDs: 114
+[DWSync] Lead-gen forms on page: 143
+[LeadsSync] Form 2449233332261397 (NSI - Direct Walkin - Conditional Logic) — fetching since: 2026-05-19T02:24:19+0000
+[LeadsSync] Form 2449233332261397 — no new leads
+[LeadsSync] Form 818636004640541 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T03:52:38+0000
+[LeadsSync] Form 818636004640541 — no new leads
+[LeadsSync] Form 968880282530796 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T01:54:43+0000
+[LeadsSync] Form 968880282530796 — no new leads
+[LeadsSync] Sync complete — total pushed this run: 0
+[DWSync] Already running — skipping.
+[DWSync] Already running — skipping.
+[DWSync] Already running — skipping.
+[LeadsSync] Form 2449233332261397 (NSI - Direct Walkin - Conditional Logic) — fetching since: 2026-05-19T02:24:19+0000
+[LeadsSync] Form 2449233332261397 — no new leads
+[LeadsSync] Form 818636004640541 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T03:52:38+0000
+[LeadsSync] Form 818636004640541 — no new leads
+[LeadsSync] Form 968880282530796 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T01:54:43+0000
+[LeadsSync] Form 968880282530796 — no new leads
+[LeadsSync] Sync complete — total pushed this run: 0
+[DWSync] Scanned 45226 total leads — 697 new DW leads to push.
+[DWSync] Sync error: Unable to parse range: DW LEADS FROM MKT SW!A1
+[LeadsSync] No previous sync record. Backfilling last 7 days.
+[LeadsSync] Syncing page 113830624877941: 2026-05-12T04:03:46.202Z → 2026-05-19T04:03:46.202Z
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: 'Error validating access token: Session has expired on Wednesday, 13-May-26 23:00:00 PDT. The current time is Monday, 18-May-26 21:03:47 PDT.',
+    type: 'OAuthException',
+    code: 190,
+    error_subcode: 463,
+    fbtrace_id: 'A1Rd40d76aVfqOtbrEmSPTk'
+  }
+}
+[LeadsSync] Error syncing page 113830624877941: Request failed with status code 401
+[LeadsSync] Syncing page 919735281228628: 2026-05-12T04:03:46.202Z → 2026-05-19T04:03:46.202Z
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: '(#190) This method must be called with a Page Access Token',
+    type: 'OAuthException',
+    code: 190,
+    fbtrace_id: 'Abu2r8vMbgZk1dVlDMepa--'
+  }
+}
+[LeadsSync] Error syncing page 919735281228628: Request failed with status code 400
+[LeadsSync] Syncing page 355327027658692: 2026-05-12T04:03:46.202Z → 2026-05-19T04:03:46.202Z
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: '(#190) This method must be called with a Page Access Token',
+    type: 'OAuthException',
+    code: 190,
+    fbtrace_id: 'AUZhh9ndo8Pyn59B2DAC9EJ'
+  }
+}
+[LeadsSync] Error syncing page 355327027658692: Request failed with status code 400
+[LeadsSync] Syncing page 332255769969394: 2026-05-12T04:03:46.202Z → 2026-05-19T04:03:46.202Z
+[LeadsSync] Could not fetch page token via Graph for page 332255769969394: (#10) This endpoint requires the 'pages_read_engagement' permission or the 'Page Public Content Access' feature or the 'Page Public Metadata Access' feature. Refer to https://developers.facebook.com/docs/apps/review/login-permissions#manage-pages, https://developers.facebook.com/docs/apps/review/feature#reference-PAGES_ACCESS and https://developers.facebook.com/docs/apps/review/feature#page-public-metadata-access for details.
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: '(#190) This method must be called with a Page Access Token',
+    type: 'OAuthException',
+    code: 190,
+    fbtrace_id: 'AeP2H-hBT3qcEJzENHbKcI4'
+  }
+}
+[LeadsSync] Error syncing page 332255769969394: Request failed with status code 400
+[LeadsSync] One or more pages failed — JobState cursor NOT advanced. Will retry on next run.
+[DWSync] Starting sync…
+[DWSync] Fetching DW campaign IDs from Meta…
+[DWSync] Account 384231607347196: 111 campaign IDs so far
+[DWSync] Account 1795178471390515: 114 campaign IDs so far
+[DWSync] DW campaign IDs: 114
+[DWSync] Lead-gen forms on page: 143
+[DWSync] Already running — skipping.
+[LeadsSync] Form 2449233332261397 (NSI - Direct Walkin - Conditional Logic) — fetching since: 2026-05-19T02:24:19+0000
+[LeadsSync] Form 2449233332261397 — no new leads
+[LeadsSync] Form 818636004640541 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T03:52:38+0000
+[LeadsSync] Form 818636004640541 — no new leads
+[LeadsSync] Form 968880282530796 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T01:54:43+0000
+[LeadsSync] Form 968880282530796 — no new leads
+[LeadsSync] Sync complete — total pushed this run: 0
+[DWSync] Already running — skipping.
+[DWSync] Already running — skipping.
+[DWSync] Scanned 45218 total leads — 698 new DW leads to push.
+[DWSync] Sync error: Unable to parse range: DW LEADS FROM MKT SW!A1
+[DWSync] Starting sync…
+[DWSync] Fetching DW campaign IDs from Meta…
+[DWSync] Account 384231607347196: 111 campaign IDs so far
+[DWSync] Account 1795178471390515: 114 campaign IDs so far
+[DWSync] DW campaign IDs: 114
+[DWSync] Lead-gen forms on page: 143
+[LeadsSync] Form 2449233332261397 (NSI - Direct Walkin - Conditional Logic) — fetching since: 2026-05-19T02:24:19+0000
+[LeadsSync] Form 2449233332261397 — no new leads
+[LeadsSync] Form 818636004640541 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T03:52:38+0000
+[LeadsSync] Form 818636004640541 — no new leads
+[LeadsSync] Form 968880282530796 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T01:54:43+0000
+[LeadsSync] Form 968880282530796 — no new leads
+[LeadsSync] Sync complete — total pushed this run: 0
+[DWSync] Already running — skipping.
+[DWSync] Already running — skipping.
+[LeadsSync] Form 2449233332261397 (NSI - Direct Walkin - Conditional Logic) — fetching since: 2026-05-19T04:13:44+0000
+[LeadsSync] Form 2449233332261397 — no new leads
+[LeadsSync] Form 818636004640541 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T03:52:38+0000
+[LeadsSync] Form 818636004640541 — no new leads
+[LeadsSync] Form 968880282530796 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T01:54:43+0000
+[LeadsSync] Form 968880282530796 — no new leads
+[LeadsSync] Sync complete — total pushed this run: 0
+[DWSync] Already running — skipping.
+[LeadsSync] No previous sync record. Backfilling last 7 days.
+[LeadsSync] Syncing page 113830624877941: 2026-05-12T04:18:46.212Z → 2026-05-19T04:18:46.212Z
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: 'Error validating access token: Session has expired on Wednesday, 13-May-26 23:00:00 PDT. The current time is Monday, 18-May-26 21:18:47 PDT.',
+    type: 'OAuthException',
+    code: 190,
+    error_subcode: 463,
+    fbtrace_id: 'A49oa_PVJnTi5Jh3mALSsAc'
+  }
+}
+[LeadsSync] Error syncing page 113830624877941: Request failed with status code 401
+[LeadsSync] Syncing page 919735281228628: 2026-05-12T04:18:46.212Z → 2026-05-19T04:18:46.212Z
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: '(#190) This method must be called with a Page Access Token',
+    type: 'OAuthException',
+    code: 190,
+    fbtrace_id: 'A2sNirn9hhkkyyfdiBCMbc_'
+  }
+}
+[LeadsSync] Error syncing page 919735281228628: Request failed with status code 400
+[LeadsSync] Syncing page 355327027658692: 2026-05-12T04:18:46.212Z → 2026-05-19T04:18:46.212Z
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: '(#190) This method must be called with a Page Access Token',
+    type: 'OAuthException',
+    code: 190,
+    fbtrace_id: 'ARfENkBE-lCaoHpk76CN9-1'
+  }
+}
+[LeadsSync] Error syncing page 355327027658692: Request failed with status code 400
+[LeadsSync] Syncing page 332255769969394: 2026-05-12T04:18:46.212Z → 2026-05-19T04:18:46.212Z
+[LeadsSync] Could not fetch page token via Graph for page 332255769969394: (#10) This endpoint requires the 'pages_read_engagement' permission or the 'Page Public Content Access' feature or the 'Page Public Metadata Access' feature. Refer to https://developers.facebook.com/docs/apps/review/login-permissions#manage-pages, https://developers.facebook.com/docs/apps/review/feature#reference-PAGES_ACCESS and https://developers.facebook.com/docs/apps/review/feature#page-public-metadata-access for details.
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: '(#190) This method must be called with a Page Access Token',
+    type: 'OAuthException',
+    code: 190,
+    fbtrace_id: 'AWnnOMjFhTfZDkx9u4We4cV'
+  }
+}
+[LeadsSync] Error syncing page 332255769969394: Request failed with status code 400
+[LeadsSync] One or more pages failed — JobState cursor NOT advanced. Will retry on next run.
+[DWSync] Scanned 45211 total leads — 698 new DW leads to push.
+[DWSync] Sync error: Unable to parse range: DW LEADS FROM MKT SW!A1
+[DWSync] Starting sync…
+[DWSync] Fetching DW campaign IDs from Meta…
+[DWSync] Account 384231607347196: 111 campaign IDs so far
+[DWSync] Account 1795178471390515: 114 campaign IDs so far
+[DWSync] DW campaign IDs: 114
+[DWSync] Lead-gen forms on page: 143
+[DWSync] Already running — skipping.
+[LeadsSync] Form 2449233332261397 (NSI - Direct Walkin - Conditional Logic) — fetching since: 2026-05-19T04:13:44+0000
+[LeadsSync] Form 2449233332261397 — no new leads
+[LeadsSync] Form 818636004640541 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T03:52:38+0000
+[LeadsSync] Form 818636004640541 — no new leads
+[LeadsSync] Form 968880282530796 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T01:54:43+0000
+[LeadsSync] Form 968880282530796 — no new leads
+[LeadsSync] Sync complete — total pushed this run: 0
+[DWSync] Already running — skipping.
+[DWSync] Already running — skipping.
+[LeadsSync] Form 2449233332261397 (NSI - Direct Walkin - Conditional Logic) — fetching since: 2026-05-19T04:13:44+0000
+[LeadsSync] Form 2449233332261397 — no new leads
+[LeadsSync] Form 818636004640541 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T03:52:38+0000
+[LeadsSync] Form 818636004640541 — no new leads
+[LeadsSync] Form 968880282530796 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T01:54:43+0000
+[LeadsSync] Form 968880282530796 — no new leads
+[LeadsSync] Sync complete — total pushed this run: 0
+[DWSync] Already running — skipping.
+[DWSync] Scanned 45209 total leads — 700 new DW leads to push.
+[DWSync] Sync error: Unable to parse range: DW LEADS FROM MKT SW!A1
+[DWSync] Starting sync…
+[DWSync] Fetching DW campaign IDs from Meta…
+[DWSync] Account 384231607347196: 111 campaign IDs so far
+[DWSync] Account 1795178471390515: 114 campaign IDs so far
+[DWSync] DW campaign IDs: 114
+[DWSync] Lead-gen forms on page: 143
+[DWSync] Already running — skipping.
+[LeadsSync] Form 2449233332261397 (NSI - Direct Walkin - Conditional Logic) — fetching since: 2026-05-19T04:13:44+0000
+[LeadsSync] Form 2449233332261397 — no new leads
+[LeadsSync] Form 818636004640541 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T04:33:00+0000
+[LeadsSync] Form 818636004640541 — no new leads
+[LeadsSync] Form 968880282530796 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T01:54:43+0000
+[LeadsSync] Form 968880282530796 — no new leads
+[LeadsSync] Sync complete — total pushed this run: 0
+[LeadsSync] No previous sync record. Backfilling last 7 days.
+[LeadsSync] Syncing page 113830624877941: 2026-05-12T04:33:46.216Z → 2026-05-19T04:33:46.216Z
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: 'Error validating access token: Session has expired on Wednesday, 13-May-26 23:00:00 PDT. The current time is Monday, 18-May-26 21:33:47 PDT.',
+    type: 'OAuthException',
+    code: 190,
+    error_subcode: 463,
+    fbtrace_id: 'AFPJ8pB8xopOOzNI9EMoFhs'
+  }
+}
+[LeadsSync] Error syncing page 113830624877941: Request failed with status code 401
+[LeadsSync] Syncing page 919735281228628: 2026-05-12T04:33:46.216Z → 2026-05-19T04:33:46.216Z
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: '(#190) This method must be called with a Page Access Token',
+    type: 'OAuthException',
+    code: 190,
+    fbtrace_id: 'AoiD-SQD1gWGVn9Yllknm2X'
+  }
+}
+[LeadsSync] Error syncing page 919735281228628: Request failed with status code 400
+[LeadsSync] Syncing page 355327027658692: 2026-05-12T04:33:46.216Z → 2026-05-19T04:33:46.216Z
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: '(#190) This method must be called with a Page Access Token',
+    type: 'OAuthException',
+    code: 190,
+    fbtrace_id: 'AVcnNrChcLiwnbeAw4yJtgS'
+  }
+}
+[LeadsSync] Error syncing page 355327027658692: Request failed with status code 400
+[LeadsSync] Syncing page 332255769969394: 2026-05-12T04:33:46.216Z → 2026-05-19T04:33:46.216Z
+[LeadsSync] Could not fetch page token via Graph for page 332255769969394: (#10) This endpoint requires the 'pages_read_engagement' permission or the 'Page Public Content Access' feature or the 'Page Public Metadata Access' feature. Refer to https://developers.facebook.com/docs/apps/review/login-permissions#manage-pages, https://developers.facebook.com/docs/apps/review/feature#reference-PAGES_ACCESS and https://developers.facebook.com/docs/apps/review/feature#page-public-metadata-access for details.
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: '(#190) This method must be called with a Page Access Token',
+    type: 'OAuthException',
+    code: 190,
+    fbtrace_id: 'ATOh55anzDorkHN10gnuC6C'
+  }
+}
+[LeadsSync] Error syncing page 332255769969394: Request failed with status code 400
+[LeadsSync] One or more pages failed — JobState cursor NOT advanced. Will retry on next run.
+[DWSync] Already running — skipping.
+[DWSync] Already running — skipping.
+[DWSync] Scanned 45208 total leads — 703 new DW leads to push.
+[DWSync] Sync error: Unable to parse range: DW LEADS FROM MKT SW!A1
+[LeadsSync] Form 2449233332261397 (NSI - Direct Walkin - Conditional Logic) — fetching since: 2026-05-19T04:13:44+0000
+[LeadsSync] Form 2449233332261397 — no new leads
+[LeadsSync] Form 818636004640541 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T04:37:48+0000
+[LeadsSync] Form 818636004640541 — no new leads
+[LeadsSync] Form 968880282530796 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T01:54:43+0000
+[LeadsSync] Form 968880282530796 — no new leads
+[LeadsSync] Sync complete — total pushed this run: 0
+[DWSync] Starting sync…
+[DWSync] Fetching DW campaign IDs from Meta…
+[DWSync] Account 384231607347196: 111 campaign IDs so far
+[DWSync] Account 1795178471390515: 114 campaign IDs so far
+[DWSync] DW campaign IDs: 114
+[DWSync] Lead-gen forms on page: 143
+[DWSync] Already running — skipping.
+[DWSync] Already running — skipping.
+[LeadsSync] Form 2449233332261397 (NSI - Direct Walkin - Conditional Logic) — fetching since: 2026-05-19T04:13:44+0000
+[LeadsSync] Form 2449233332261397 — no new leads
+[LeadsSync] Form 818636004640541 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T04:37:48+0000
+[LeadsSync] Form 818636004640541 — no new leads
+[LeadsSync] Form 968880282530796 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T01:54:43+0000
+[LeadsSync] Form 968880282530796 — no new leads
+[LeadsSync] Sync complete — total pushed this run: 0
+[DWSync] Already running — skipping.
+[DWSync] Scanned 45205 total leads — 705 new DW leads to push.
+[DWSync] Sync error: Unable to parse range: DW LEADS FROM MKT SW!A1
+[DWSync] Starting sync…
+[DWSync] Fetching DW campaign IDs from Meta…
+[DWSync] Account 384231607347196: 111 campaign IDs so far
+[DWSync] Account 1795178471390515: 114 campaign IDs so far
+[DWSync] DW campaign IDs: 114
+[DWSync] Lead-gen forms on page: 143
+[LeadsSync] Form 2449233332261397 (NSI - Direct Walkin - Conditional Logic) — fetching since: 2026-05-19T04:44:17+0000
+[LeadsSync] Form 2449233332261397 — no new leads
+[LeadsSync] Form 818636004640541 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T04:37:48+0000
+[LeadsSync] Form 818636004640541 — no new leads
+[LeadsSync] Form 968880282530796 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T01:54:43+0000
+[LeadsSync] Form 968880282530796 — no new leads
+[LeadsSync] Sync complete — total pushed this run: 0
+[DWSync] Already running — skipping.
+[LeadsSync] No previous sync record. Backfilling last 7 days.
+[LeadsSync] Syncing page 113830624877941: 2026-05-12T04:48:46.229Z → 2026-05-19T04:48:46.229Z
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: 'Error validating access token: Session has expired on Wednesday, 13-May-26 23:00:00 PDT. The current time is Monday, 18-May-26 21:48:47 PDT.',
+    type: 'OAuthException',
+    code: 190,
+    error_subcode: 463,
+    fbtrace_id: 'A1Gcdlf-1a6b0AbT52np5lr'
+  }
+}
+[LeadsSync] Error syncing page 113830624877941: Request failed with status code 401
+[LeadsSync] Syncing page 919735281228628: 2026-05-12T04:48:46.229Z → 2026-05-19T04:48:46.229Z
+[fetchAllAdAccountIds] Fetched 62 ad accounts from Meta API (1 page(s))
+[fetchAllAdAccountIds] Accounts: MHS Ad Account 2025  (Read-Only) (1308491553874548), My Health School (Read-Only) (674301275617033), My Health School (Read-Only) (1539407094034141), My Health School (Read-Only) (1925007714810225), My Health School (Read-Only) (1296097642584236), MHS 2025 (1538719834059161), MHS Dental Care (Read-Only) (1604314490910814), Direct Walkin 2026 (1732096027755048), Integfarms (705155253819861), My Health School (Current) (530615489114338), Old Account MHS (1739044856595087), MHS Ad Account (2024) (384231607347196), My Health School - Test Account (1118966742784490), Gayathri R (950422053151053), MHS Integfarms-2 (986663466448607), MHS S-2 (332450076623103), MHS Integfarms-1 (1693523178051861), MHS S-1 (1165675118015737), MHS Dental Care (327236376911765), Integfarms My Health School Private Limited (Read-Only) (1895689934526774), Integfarms My Health School Private Limited (Read-Only) (582803158171493), Doctor Farmer MHS (Read-Only) (503412109433387), Doctor Farmer (Read-Only) (1354906932232055), NEW MHS 01 (1016470376862563), My Health School (Read-Only) (1060742598918234), MHS - Doctor Farmer (Read-Only) (1049228324014887), My Health School - GB (Read-Only) (703182482654845), Doctor Farmer MHS (Read-Only) (1512710456385560), Integfarms MHS 01 (1421944619002441), Doctor Farmer (Read-Only) (1405950350701165), MHS - Doctor Farmer (Read-Only) (1080027194035334), Doctor Farmer (Read-Only) (1310409591089555), MHS - Doctor Farmer (Read-Only) (1456801645748908), Doctor Farmer MHS (Read-Only) (1086248866973644), Doctor Farmer (Read-Only) (1098419872240893), My Health School (Read-Only) (770500352042994), My Health School (Read-Only) (1237451050925712), My Health School 2025 (1088771750122808), My Health School (Read-Only) (1096911542533142), My Health School (Read-Only) (2575731159469988), MHS Ad Account 2025  (Read-Only) (2642835622725593), My Health School 2025 (Read-Only) (1475893974143238), MHS Ad Account 2025  (Read-Only) (1503251064631745), My Health School (Read-Only) (2549288575444083), My Health School (Read-Only) (844712348524587), My Health School (Read-Only) (679745958109107), Integfarm MHS 02 (1398296668512853), My Health School (Read-Only) (1131102628838211), MHS Ad Account 2025  (Read-Only) (1966869560541483), Integfarms 01 (1990711071494666), My Health School 2025 (Read-Only) (1287748163109477), My Health School (Read-Only) (822850357222574), Test WhatsApp Business Account (Read-Only) (738495419197107), My Health School (Read-Only) (1242377951142197), My Health School (Read-Only) (744271878694046), Integfarms 02 (1512093733230882), True Food Store Doctor Farmer (Read-Only) (947521991096813), My Health School (Read-Only) (1937678256835970), My Health School (Read-Only) (1911157109808357), New MHS 02 (2183252375757070), MHS DF 01 (1795178471390515), Whats App (Read-Only) (1237278111897840)
+[InsightsSync] Found 62 ad accounts to sync
+[InsightsSync] Starting sync for 62 accounts, date range: 2026-05-19..2026-05-19
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: '(#190) This method must be called with a Page Access Token',
+    type: 'OAuthException',
+    code: 190,
+    fbtrace_id: 'AnwC8oIAfL1P4ACPimz-UEG'
+  }
+}
+[LeadsSync] Error syncing page 919735281228628: Request failed with status code 400
+[LeadsSync] Syncing page 355327027658692: 2026-05-12T04:48:46.229Z → 2026-05-19T04:48:46.229Z
+[InsightsSync] - MHS Ad Account 2025  (Read-Only) (1308491553874548): no new data for 2026-05-19..2026-05-19
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: '(#190) This method must be called with a Page Access Token',
+    type: 'OAuthException',
+    code: 190,
+    fbtrace_id: 'AKzVcrVE3VGfNIwpZ4H2l0r'
+  }
+}
+[LeadsSync] Error syncing page 355327027658692: Request failed with status code 400
+[LeadsSync] Syncing page 332255769969394: 2026-05-12T04:48:46.229Z → 2026-05-19T04:48:46.229Z
+[InsightsSync] - My Health School (Read-Only) (674301275617033): no new data for 2026-05-19..2026-05-19
+[LeadsSync] Could not fetch page token via Graph for page 332255769969394: (#10) This endpoint requires the 'pages_read_engagement' permission or the 'Page Public Content Access' feature or the 'Page Public Metadata Access' feature. Refer to https://developers.facebook.com/docs/apps/review/login-permissions#manage-pages, https://developers.facebook.com/docs/apps/review/feature#reference-PAGES_ACCESS and https://developers.facebook.com/docs/apps/review/feature#page-public-metadata-access for details.
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: '(#190) This method must be called with a Page Access Token',
+    type: 'OAuthException',
+    code: 190,
+    fbtrace_id: 'Agr1R72jUuRydi-H2psMhBA'
+  }
+}
+[LeadsSync] Error syncing page 332255769969394: Request failed with status code 400
+[LeadsSync] One or more pages failed — JobState cursor NOT advanced. Will retry on next run.
+[InsightsSync] - My Health School (Read-Only) (1539407094034141): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (1925007714810225): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (1296097642584236): no new data for 2026-05-19..2026-05-19
+[InsightsSync] ✓ MHS 2025 (1538719834059161): 6 rows for 2026-05-19..2026-05-19
+[InsightsSync] - MHS Dental Care (Read-Only) (1604314490910814): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Direct Walkin 2026 (1732096027755048): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Integfarms (705155253819861): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Current) (530615489114338): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Old Account MHS (1739044856595087): no new data for 2026-05-19..2026-05-19
+[InsightsSync] ✓ MHS Ad Account (2024) (384231607347196): 41 rows for 2026-05-19..2026-05-19
+[InsightsSync] ✓ My Health School - Test Account (1118966742784490): 37 rows for 2026-05-19..2026-05-19
+[InsightsSync] - Gayathri R (950422053151053): no new data for 2026-05-19..2026-05-19
+[InsightsSync] ✓ MHS Integfarms-2 (986663466448607): 13 rows for 2026-05-19..2026-05-19
+[InsightsSync] ✓ MHS S-2 (332450076623103): 6 rows for 2026-05-19..2026-05-19
+[InsightsSync] ✓ MHS Integfarms-1 (1693523178051861): 10 rows for 2026-05-19..2026-05-19
+[InsightsSync] ✓ MHS S-1 (1165675118015737): 18 rows for 2026-05-19..2026-05-19
+[InsightsSync] - MHS Dental Care (327236376911765): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Integfarms My Health School Private Limited (Read-Only) (1895689934526774): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Integfarms My Health School Private Limited (Read-Only) (582803158171493): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Doctor Farmer MHS (Read-Only) (503412109433387): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Doctor Farmer (Read-Only) (1354906932232055): no new data for 2026-05-19..2026-05-19
+[InsightsSync] ✓ NEW MHS 01 (1016470376862563): 9 rows for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (1060742598918234): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - MHS - Doctor Farmer (Read-Only) (1049228324014887): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School - GB (Read-Only) (703182482654845): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Doctor Farmer MHS (Read-Only) (1512710456385560): no new data for 2026-05-19..2026-05-19
+[InsightsSync] ✓ Integfarms MHS 01 (1421944619002441): 24 rows for 2026-05-19..2026-05-19
+[InsightsSync] - Doctor Farmer (Read-Only) (1405950350701165): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - MHS - Doctor Farmer (Read-Only) (1080027194035334): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Doctor Farmer (Read-Only) (1310409591089555): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - MHS - Doctor Farmer (Read-Only) (1456801645748908): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Doctor Farmer MHS (Read-Only) (1086248866973644): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Doctor Farmer (Read-Only) (1098419872240893): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (770500352042994): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (1237451050925712): no new data for 2026-05-19..2026-05-19
+[InsightsSync] ✓ My Health School 2025 (1088771750122808): 10 rows for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (1096911542533142): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (2575731159469988): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - MHS Ad Account 2025  (Read-Only) (2642835622725593): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School 2025 (Read-Only) (1475893974143238): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - MHS Ad Account 2025  (Read-Only) (1503251064631745): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (2549288575444083): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (844712348524587): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (679745958109107): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Integfarm MHS 02 (1398296668512853): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (1131102628838211): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - MHS Ad Account 2025  (Read-Only) (1966869560541483): no new data for 2026-05-19..2026-05-19
+[InsightsSync] ✓ Integfarms 01 (1990711071494666): 18 rows for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School 2025 (Read-Only) (1287748163109477): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (822850357222574): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Test WhatsApp Business Account (Read-Only) (738495419197107): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (1242377951142197): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (744271878694046): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - Integfarms 02 (1512093733230882): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - True Food Store Doctor Farmer (Read-Only) (947521991096813): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (1937678256835970): no new data for 2026-05-19..2026-05-19
+[InsightsSync] - My Health School (Read-Only) (1911157109808357): no new data for 2026-05-19..2026-05-19
+[InsightsSync] ✓ New MHS 02 (2183252375757070): 19 rows for 2026-05-19..2026-05-19
+[InsightsSync] ✓ MHS DF 01 (1795178471390515): 10 rows for 2026-05-19..2026-05-19
+[InsightsSync] - Whats App (Read-Only) (1237278111897840): no new data for 2026-05-19..2026-05-19
+[InsightsSync] Completed: 62 accounts processed, total 221 rows synced for 2026-05-19..2026-05-19
+[DWSync] Already running — skipping.
+[DWSync] Already running — skipping.
+[DWSync] Scanned 45200 total leads — 707 new DW leads to push.
+[DWSync] Sync error: Unable to parse range: DW LEADS FROM MKT SW!A1
+[LeadsSync] Form 2449233332261397 (NSI - Direct Walkin - Conditional Logic) — fetching since: 2026-05-19T04:44:17+0000
+[LeadsSync] Form 2449233332261397 — no new leads
+[LeadsSync] Form 818636004640541 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T04:37:48+0000
+[LeadsSync] Form 818636004640541 — no new leads
+[LeadsSync] Form 968880282530796 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T01:54:43+0000
+[LeadsSync] Form 968880282530796 — no new leads
+[LeadsSync] Sync complete — total pushed this run: 0
+[DWSync] Starting sync…
+[DWSync] Fetching DW campaign IDs from Meta…
+[DWSync] Account 384231607347196: 111 campaign IDs so far
+[DWSync] Account 1795178471390515: 114 campaign IDs so far
+[DWSync] DW campaign IDs: 114
+[DWSync] Lead-gen forms on page: 143
+[DWSync] Already running — skipping.
+[LeadsSync] Form 2449233332261397 (NSI - Direct Walkin - Conditional Logic) — fetching since: 2026-05-19T04:44:17+0000
+[LeadsSync] Form 2449233332261397 — no new leads
+[LeadsSync] Form 818636004640541 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T04:37:48+0000
+[LeadsSync] Form 818636004640541 — no new leads
+[LeadsSync] Form 968880282530796 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T01:54:43+0000
+[LeadsSync] Form 968880282530796 — no new leads
+[LeadsSync] Sync complete — total pushed this run: 0
+[DWSync] Already running — skipping.
+[DWSync] Already running — skipping.
+[DWSync] Scanned 45197 total leads — 707 new DW leads to push.
+[DWSync] Sync error: Unable to parse range: DW LEADS FROM MKT SW!A1
+[DWSync] Starting sync…
+[DWSync] Fetching DW campaign IDs from Meta…
+[DWSync] Account 384231607347196: 111 campaign IDs so far
+[DWSync] Account 1795178471390515: 114 campaign IDs so far
+[DWSync] DW campaign IDs: 114
+[DWSync] Lead-gen forms on page: 143
+[LeadsSync] Form 2449233332261397 (NSI - Direct Walkin - Conditional Logic) — fetching since: 2026-05-19T04:44:17+0000
+[LeadsSync] Form 2449233332261397 — no new leads
+[LeadsSync] Form 818636004640541 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T04:37:48+0000
+[LeadsSync] Form 818636004640541 — no new leads
+[LeadsSync] Form 968880282530796 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T01:54:43+0000
+[LeadsSync] Form 968880282530796 — no new leads
+[LeadsSync] Sync complete — total pushed this run: 0
+[LeadsSync] No previous sync record. Backfilling last 7 days.
+[LeadsSync] Syncing page 113830624877941: 2026-05-12T05:03:46.240Z → 2026-05-19T05:03:46.240Z
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: 'Error validating access token: Session has expired on Wednesday, 13-May-26 23:00:00 PDT. The current time is Monday, 18-May-26 22:03:47 PDT.',
+    type: 'OAuthException',
+    code: 190,
+    error_subcode: 463,
+    fbtrace_id: 'AIn2am5abLisevtSmBtq7qK'
+  }
+}
+[LeadsSync] Error syncing page 113830624877941: Request failed with status code 401
+[LeadsSync] Syncing page 919735281228628: 2026-05-12T05:03:46.240Z → 2026-05-19T05:03:46.240Z
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: '(#190) This method must be called with a Page Access Token',
+    type: 'OAuthException',
+    code: 190,
+    fbtrace_id: 'A4ZjJpNH_9jngjM4gmrv5iy'
+  }
+}
+[LeadsSync] Error syncing page 919735281228628: Request failed with status code 400
+[LeadsSync] Syncing page 355327027658692: 2026-05-12T05:03:46.240Z → 2026-05-19T05:03:46.240Z
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: '(#190) This method must be called with a Page Access Token',
+    type: 'OAuthException',
+    code: 190,
+    fbtrace_id: 'AxMKaUn6IhZim5ZKFzLNty3'
+  }
+}
+[LeadsSync] Error syncing page 355327027658692: Request failed with status code 400
+[LeadsSync] Syncing page 332255769969394: 2026-05-12T05:03:46.240Z → 2026-05-19T05:03:46.240Z
+[LeadsSync] Could not fetch page token via Graph for page 332255769969394: (#10) This endpoint requires the 'pages_read_engagement' permission or the 'Page Public Content Access' feature or the 'Page Public Metadata Access' feature. Refer to https://developers.facebook.com/docs/apps/review/login-permissions#manage-pages, https://developers.facebook.com/docs/apps/review/feature#reference-PAGES_ACCESS and https://developers.facebook.com/docs/apps/review/feature#page-public-metadata-access for details.
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: '(#190) This method must be called with a Page Access Token',
+    type: 'OAuthException',
+    code: 190,
+    fbtrace_id: 'Aob-kL1fvPTNoSCMTavkGwz'
+  }
+}
+[LeadsSync] Error syncing page 332255769969394: Request failed with status code 400
+[LeadsSync] One or more pages failed — JobState cursor NOT advanced. Will retry on next run.
+[DWSync] Already running — skipping.
+[DWSync] Already running — skipping.
+[LeadsSync] Form 2449233332261397 (NSI - Direct Walkin - Conditional Logic) — fetching since: 2026-05-19T04:44:17+0000
+[LeadsSync] Form 2449233332261397 — no new leads
+[LeadsSync] Form 818636004640541 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T04:37:48+0000
+[LeadsSync] Form 818636004640541 — no new leads
+[LeadsSync] Form 968880282530796 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T01:54:43+0000
+[LeadsSync] Form 968880282530796 — no new leads
+[LeadsSync] Sync complete — total pushed this run: 0
+[DWSync] Already running — skipping.
+[DWSync] Scanned 45191 total leads — 707 new DW leads to push.
+[DWSync] Sync error: Unable to parse range: DW LEADS FROM MKT SW!A1
+[DWSync] Starting sync…
+[DWSync] Fetching DW campaign IDs from Meta…
+[DWSync] Account 384231607347196: 111 campaign IDs so far
+[DWSync] Account 1795178471390515: 114 campaign IDs so far
+[DWSync] DW campaign IDs: 114
+[DWSync] Lead-gen forms on page: 143
+[DWSync] Already running — skipping.
+[LeadsSync] Form 2449233332261397 (NSI - Direct Walkin - Conditional Logic) — fetching since: 2026-05-19T04:44:17+0000
+[LeadsSync] Form 2449233332261397 — no new leads
+[LeadsSync] Form 818636004640541 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T04:37:48+0000
+[LeadsSync] Form 818636004640541 — no new leads
+[LeadsSync] Form 968880282530796 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T01:54:43+0000
+[LeadsSync] Form 968880282530796 — no new leads
+[LeadsSync] Sync complete — total pushed this run: 0
+[DWSync] Already running — skipping.
+[DWSync] Already running — skipping.
+[DWSync] Scanned 45190 total leads — 709 new DW leads to push.
+[DWSync] Sync error: Unable to parse range: DW LEADS FROM MKT SW!A1
+[LeadsSync] Form 2449233332261397 (NSI - Direct Walkin - Conditional Logic) — fetching since: 2026-05-19T04:44:17+0000
+[LeadsSync] Form 2449233332261397 — no new leads
+[LeadsSync] Form 818636004640541 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T04:37:48+0000
+[LeadsSync] Form 818636004640541 — no new leads
+[LeadsSync] Form 968880282530796 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T01:54:43+0000
+[LeadsSync] Form 968880282530796 — no new leads
+[LeadsSync] Sync complete — total pushed this run: 0
+[DWSync] Starting sync…
+[DWSync] Fetching DW campaign IDs from Meta…
+[LeadsSync] No previous sync record. Backfilling last 7 days.
+[LeadsSync] Syncing page 113830624877941: 2026-05-12T05:18:46.242Z → 2026-05-19T05:18:46.242Z
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[DWSync] Account 384231607347196: 111 campaign IDs so far
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: 'Error validating access token: Session has expired on Wednesday, 13-May-26 23:00:00 PDT. The current time is Monday, 18-May-26 22:18:47 PDT.',
+    type: 'OAuthException',
+    code: 190,
+    error_subcode: 463,
+    fbtrace_id: 'APZfFq-vJr7u4kycUJdYxEI'
+  }
+}
+[LeadsSync] Error syncing page 113830624877941: Request failed with status code 401
+[LeadsSync] Syncing page 919735281228628: 2026-05-12T05:18:46.242Z → 2026-05-19T05:18:46.242Z
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: '(#190) This method must be called with a Page Access Token',
+    type: 'OAuthException',
+    code: 190,
+    fbtrace_id: 'AJBoQKF55wG86buo0qXoVyo'
+  }
+}
+[LeadsSync] Error syncing page 919735281228628: Request failed with status code 400
+[LeadsSync] Syncing page 355327027658692: 2026-05-12T05:18:46.242Z → 2026-05-19T05:18:46.242Z
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: '(#190) This method must be called with a Page Access Token',
+    type: 'OAuthException',
+    code: 190,
+    fbtrace_id: 'AnHuxHsNykXNqz7GM765L9j'
+  }
+}
+[LeadsSync] Error syncing page 355327027658692: Request failed with status code 400
+[LeadsSync] Syncing page 332255769969394: 2026-05-12T05:18:46.242Z → 2026-05-19T05:18:46.242Z
+[LeadsSync] Could not fetch page token via Graph for page 332255769969394: (#10) This endpoint requires the 'pages_read_engagement' permission or the 'Page Public Content Access' feature or the 'Page Public Metadata Access' feature. Refer to https://developers.facebook.com/docs/apps/review/login-permissions#manage-pages, https://developers.facebook.com/docs/apps/review/feature#reference-PAGES_ACCESS and https://developers.facebook.com/docs/apps/review/feature#page-public-metadata-access for details.
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[DWSync] Account 1795178471390515: 114 campaign IDs so far
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: '(#190) This method must be called with a Page Access Token',
+    type: 'OAuthException',
+    code: 190,
+    fbtrace_id: 'AZib_EQ1m9ICCiqxbCQ3ktj'
+  }
+}
+[LeadsSync] Error syncing page 332255769969394: Request failed with status code 400
+[LeadsSync] One or more pages failed — JobState cursor NOT advanced. Will retry on next run.
+[DWSync] DW campaign IDs: 114
+[DWSync] Lead-gen forms on page: 143
+[DWSync] Already running — skipping.
+[DWSync] Already running — skipping.
+[LeadsSync] Form 2449233332261397 (NSI - Direct Walkin - Conditional Logic) — fetching since: 2026-05-19T04:44:17+0000
+[LeadsSync] Form 2449233332261397 — no new leads
+[LeadsSync] Form 818636004640541 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T04:37:48+0000
+[LeadsSync] Form 818636004640541 — no new leads
+[LeadsSync] Form 968880282530796 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T01:54:43+0000
+[LeadsSync] Form 968880282530796 — no new leads
+[LeadsSync] Sync complete — total pushed this run: 0
+[DWSync] Already running — skipping.
+[DWSync] Scanned 45183 total leads — 709 new DW leads to push.
+[DWSync] Sync error: Unable to parse range: DW LEADS FROM MKT SW!A1
+[DWSync] Starting sync…
+[DWSync] Fetching DW campaign IDs from Meta…
+[DWSync] Account 384231607347196: 111 campaign IDs so far
+[DWSync] Account 1795178471390515: 114 campaign IDs so far
+[DWSync] DW campaign IDs: 114
+[DWSync] Lead-gen forms on page: 143
+[LeadsSync] Form 2449233332261397 (NSI - Direct Walkin - Conditional Logic) — fetching since: 2026-05-19T04:44:17+0000
+[LeadsSync] Form 2449233332261397 — no new leads
+[LeadsSync] Form 818636004640541 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T04:37:48+0000
+[LeadsSync] Form 818636004640541 — no new leads
+[LeadsSync] Form 968880282530796 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T01:54:43+0000
+[LeadsSync] Form 968880282530796 — no new leads
+[LeadsSync] Sync complete — total pushed this run: 0
+[DWSync] Already running — skipping.
+[DWSync] Already running — skipping.
+[DWSync] Already running — skipping.
+[LeadsSync] Form 2449233332261397 (NSI - Direct Walkin - Conditional Logic) — fetching since: 2026-05-19T04:44:17+0000
+[LeadsSync] Form 2449233332261397 — no new leads
+[LeadsSync] Form 818636004640541 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T04:37:48+0000
+[LeadsSync] Form 818636004640541 — no new leads
+[LeadsSync] Form 968880282530796 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T01:54:43+0000
+[LeadsSync] Form 968880282530796 — no new leads
+[LeadsSync] Sync complete — total pushed this run: 0
+[LeadsSync] No previous sync record. Backfilling last 7 days.
+[LeadsSync] Syncing page 113830624877941: 2026-05-12T05:33:46.244Z → 2026-05-19T05:33:46.244Z
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: 'Error validating access token: Session has expired on Wednesday, 13-May-26 23:00:00 PDT. The current time is Monday, 18-May-26 22:33:47 PDT.',
+    type: 'OAuthException',
+    code: 190,
+    error_subcode: 463,
+    fbtrace_id: 'AO5Nr3dkSLI9pU3G7nP1nCP'
+  }
+}
+[LeadsSync] Error syncing page 113830624877941: Request failed with status code 401
+[LeadsSync] Syncing page 919735281228628: 2026-05-12T05:33:46.244Z → 2026-05-19T05:33:46.244Z
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: '(#190) This method must be called with a Page Access Token',
+    type: 'OAuthException',
+    code: 190,
+    fbtrace_id: 'AF3RH8yphBmhG9-VrfCu7WN'
+  }
+}
+[LeadsSync] Error syncing page 919735281228628: Request failed with status code 400
+[LeadsSync] Syncing page 355327027658692: 2026-05-12T05:33:46.244Z → 2026-05-19T05:33:46.244Z
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: '(#190) This method must be called with a Page Access Token',
+    type: 'OAuthException',
+    code: 190,
+    fbtrace_id: 'ANlBkRFz5Le1-3vaxENLy0D'
+  }
+}
+[LeadsSync] Error syncing page 355327027658692: Request failed with status code 400
+[LeadsSync] Syncing page 332255769969394: 2026-05-12T05:33:46.244Z → 2026-05-19T05:33:46.244Z
+[LeadsSync] Could not fetch page token via Graph for page 332255769969394: (#10) This endpoint requires the 'pages_read_engagement' permission or the 'Page Public Content Access' feature or the 'Page Public Metadata Access' feature. Refer to https://developers.facebook.com/docs/apps/review/login-permissions#manage-pages, https://developers.facebook.com/docs/apps/review/feature#reference-PAGES_ACCESS and https://developers.facebook.com/docs/apps/review/feature#page-public-metadata-access for details.
+(node:30340) Warning: Label '[LeadsSync] Fetch forms list' already exists for console.time()
+[LeadsSync] Error fetching leads from Meta API: {
+  error: {
+    message: '(#190) This method must be called with a Page Access Token',
+    type: 'OAuthException',
+    code: 190,
+    fbtrace_id: 'A5oMNJ6d8qXgNfe58_3_2u_'
+  }
+}
+[LeadsSync] Error syncing page 332255769969394: Request failed with status code 400
+[LeadsSync] One or more pages failed — JobState cursor NOT advanced. Will retry on next run.
+[DWSync] Scanned 45179 total leads — 710 new DW leads to push.
+[DWSync] Sync error: Unable to parse range: DW LEADS FROM MKT SW!A1
+[DWSync] Starting sync…
+[DWSync] Fetching DW campaign IDs from Meta…
+[DWSync] Account 384231607347196: 111 campaign IDs so far
+[DWSync] Account 1795178471390515: 114 campaign IDs so far
+[DWSync] DW campaign IDs: 114
+[DWSync] Lead-gen forms on page: 143
+[DWSync] Already running — skipping.
+[LeadsSync] Form 2449233332261397 (NSI - Direct Walkin - Conditional Logic) — fetching since: 2026-05-19T04:44:17+0000
+[LeadsSync] Form 2449233332261397 — no new leads
+[LeadsSync] Form 818636004640541 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T05:37:17+0000
+[LeadsSync] Form 818636004640541 — no new leads
+[LeadsSync] Form 968880282530796 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T01:54:43+0000
+[LeadsSync] Form 968880282530796 — no new leads
+[LeadsSync] Sync complete — total pushed this run: 0
+[DWSync] Already running — skipping.
+[DWSync] Already running — skipping.
+[DWSync] Scanned 45170 total leads — 710 new DW leads to push.
+[DWSync] Sync error: Unable to parse range: DW LEADS FROM MKT SW!A1
+[DWSync] Starting sync…
+[DWSync] Fetching DW campaign IDs from Meta…
+[DWSync] Account 384231607347196: 111 campaign IDs so far
+[DWSync] Account 1795178471390515: 114 campaign IDs so far
+[DWSync] DW campaign IDs: 114
+[DWSync] Lead-gen forms on page: 143
+[LeadsSync] Form 2449233332261397 (NSI - Direct Walkin - Conditional Logic) — fetching since: 2026-05-19T04:44:17+0000
+[LeadsSync] Form 2449233332261397 — no new leads
+[LeadsSync] Form 818636004640541 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T05:37:17+0000
+[LeadsSync] Form 818636004640541 — fetched 2 leads
+[LeadsSync] Form 818636004640541 — pushed 2 new rows ✓
+[LeadsSync] Form 968880282530796 (NSI - Direct Walkin Form - Condition Logic) — fetching since: 2026-05-19T01:54:43+0000
+[LeadsSync] Form 968880282530796 — no new leads
+[LeadsSync] Sync complete — total pushed this run: 2
+[DWSync] Already running — skipping.

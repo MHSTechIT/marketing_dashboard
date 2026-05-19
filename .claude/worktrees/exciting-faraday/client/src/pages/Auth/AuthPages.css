@@ -1,0 +1,198 @@
+/* Shared auth page styles (Login + Signup) */
+
+.authPage {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  padding: 28px;
+  background-image: url("../../assets/MHS-Login.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  position: relative;
+}
+
+.authPage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.05) 0%,
+    rgba(0, 0, 0, 0.28) 55%,
+    rgba(0, 0, 0, 0.35) 100%
+  );
+  pointer-events: none;
+}
+
+.authCardWrap {
+  position: relative;
+  z-index: 1;
+  width: min(520px, 100%);
+  display: flex;
+  align-items: center;
+}
+
+.authCard {
+  width: 100%;
+  border-radius: 22px;
+  padding: 28px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.authTitle {
+  font-size: 44px;
+  line-height: 1.1;
+  font-weight: 800;
+  margin: 0 0 6px 0;
+  text-align: center;
+}
+
+.authSubtitle {
+  margin: 0 0 18px 0;
+  text-align: center;
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.authField {
+  margin-top: 14px;
+}
+
+.authInputRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.authIconBox {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  flex: 0 0 auto;
+}
+
+.authIconBox svg {
+  width: 18px;
+  height: 18px;
+  opacity: 0.95;
+}
+
+.authLabelCol {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.authLabel {
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  margin: 0;
+  font-size: 18px;
+}
+
+.authInput {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 16px;
+  margin-top: 2px;
+}
+
+.authInput::placeholder {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.authPrimaryBtn {
+  margin-top: 18px;
+  width: 100%;
+  height: 54px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: linear-gradient(180deg, rgba(151, 78, 255, 0.95), rgba(93, 44, 214, 0.95));
+  color: white;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: transform 0.08s ease, filter 0.2s ease;
+}
+
+.authPrimaryBtn:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+  filter: grayscale(10%);
+}
+
+.authPrimaryBtn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.authDivider {
+  margin: 16px 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.authDivider::before,
+.authDivider::after {
+  content: "";
+  height: 1px;
+  flex: 1 1 auto;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.authFooterLink {
+  text-align: center;
+  margin-top: 10px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.authFooterLink a {
+  color: rgba(255, 255, 255, 0.95);
+  text-decoration: underline;
+  font-weight: 700;
+}
+
+.authAlert {
+  margin-top: 12px;
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+@media (max-width: 768px) {
+  .authPage {
+    justify-content: center;
+    padding: 18px;
+  }
+
+  .authCard {
+    padding: 22px;
+  }
+
+  .authTitle {
+    font-size: 36px;
+  }
+}
+

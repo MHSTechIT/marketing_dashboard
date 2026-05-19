@@ -1,0 +1,1023 @@
+/* =========================================
+   1. GLOBAL THEME & VARIABLES
+   (Controls overall page background, colors, and fonts)
+   ========================================= */
+:root {
+  /* Use global theme variables with fallbacks */
+  --app-bg: var(--bg, #f0f2f5);
+  --card-bg: var(--card, #ffffff);
+  --text-primary: var(--text, #1e293b);
+  --text-secondary: var(--text, #64748b);
+  --text-white: #ffffff;
+
+  /* KPI Colors (Used for Top Metric Cards) - keep these for gradient cards */
+  --kpi-purple: #5b45b0;
+  --kpi-blue: #0d47a1;
+  --kpi-teal: #00897b;
+  --kpi-green: #2e7d32;
+  --kpi-pink: #d81b60;
+  --kpi-orange: #f57c00;
+
+  /* Header Color - use nav color but allow override for dark themes */
+  --header-bg: var(--nav, #0f2d5e);
+}
+
+/* Main Page Wrapper */
+.dashboard-wrapper {
+  min-height: 100vh;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  background: var(--bg, var(--app-bg, #f0f2f5));
+  padding: 1.5rem;
+  font-family: 'Roboto', 'Inter', sans-serif;
+  color: var(--text, #1e293b);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* =========================================
+   2. DASHBOARD HEADER SECTION
+   (Controls the blue banner, Main Title "Ads Analytics...", and Subtitle)
+   ========================================= */
+.dashboard-header {
+  background: var(--nav, #0f2d5e);
+  padding: 1.0rem 1.5rem;
+  border-radius: 12px;
+  border-bottom-right-radius: 32px;
+  /* Stylish Curve */
+  color: var(--nav-text, #ffffff);
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.dashboard-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.title-emoji {
+  font-size: 1.2rem;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.4rem;
+  border-radius: 50%;
+}
+
+.dashboard-subtitle {
+  color: rgba(6, 6, 6, 0.7);
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+}
+
+/* Toggle Buttons in Header */
+.theme-toggle-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.theme-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* =========================================
+   3. FILTER SECTION (Time Range & Campaign)
+   (Controls Dropdown labels "Time Range", "Select Campaign" and Refresh Button)
+   ========================================= */
+.filter-card {
+  background: var(--card, #ffffff);
+  border-radius: 10px;
+  padding: 0.85rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  color: var(--text, #1e293b);
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+/* Ensure row inside filter-card wraps properly */
+.filter-card .row {
+  flex-wrap: wrap;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+/* Stable widths for Ad Account, Campaign, Ad Name filters so dropdown position doesn't shift when selection changes */
+.filter-card .dashboard-filter-col-stable {
+  min-width: 200px;
+  max-width: 280px;
+}
+@media (min-width: 768px) {
+  .filter-card .dashboard-filter-col-stable.dashboard-filter-col-campaign {
+    min-width: 220px;
+    max-width: 320px;
+  }
+}
+
+/* Ad Name filter column: prevent collapse when row wraps */
+.ad-name-filter-col {
+  min-width: 160px;
+}
+
+.filter-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text, #64748b);
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+  opacity: 0.8;
+}
+
+.filter-select {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  background-color: var(--card, #f8fafc);
+  color: var(--text, #1e293b);
+  font-weight: 500;
+  font-size: 0.85rem;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* All Projects custom dropdown (hover split view) */
+.projects-dropdown-wrapper {
+  flex: 1;
+  min-width: 160px;
+}
+
+.projects-dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.projects-dropdown-trigger {
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 32px 9px 12px;
+  line-height: 1.4;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background-color: white;
+  color: #475569;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.projects-dropdown-trigger:hover {
+  border-color: #94a3b8;
+}
+
+.projects-dropdown-trigger:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.projects-dropdown-trigger-text {
+  flex: 1;
+  text-align: left;
+}
+
+.projects-dropdown-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  min-width: 320px;
+  max-width: 420px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  z-index: 1000;
+  display: flex;
+  overflow: hidden;
+}
+
+.projects-dropdown-left {
+  flex: 0 0 45%;
+  min-width: 140px;
+  max-height: 320px;
+  overflow-y: auto;
+  border-right: 1px solid #e2e8f0;
+}
+
+.projects-dropdown-project-row {
+  padding: 10px 12px;
+  font-size: 0.875rem;
+  color: #334155;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.projects-dropdown-project-row:hover {
+  background-color: #f1f5f9;
+}
+
+.projects-dropdown-project-row-selected {
+  background-color: #eff6ff;
+  font-weight: 600;
+  color: #1e40af;
+}
+
+.projects-dropdown-right {
+  flex: 1;
+  min-width: 160px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 12px;
+  background-color: #f8fafc;
+}
+
+.projects-dropdown-all-accounts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.projects-dropdown-project-group {
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 8px;
+}
+
+.projects-dropdown-project-group:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.projects-dropdown-group-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 4px;
+}
+
+.projects-dropdown-placeholder {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  display: block;
+}
+
+.projects-dropdown-account-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.projects-dropdown-account-item {
+  font-size: 0.8rem;
+  color: #475569;
+  padding: 6px 0;
+  line-height: 1.4;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.projects-dropdown-account-item:last-child {
+  border-bottom: none;
+}
+
+.refresh-btn {
+  background: var(--btn, #0f2d5e);
+  color: var(--btn-text, #ffffff);
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: all 0.2s;
+}
+
+.refresh-btn:hover {
+  background: var(--btn, #1e40af);
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+/* =========================================
+   4. METRICS & KPI CARDS (Top Row)
+   (Controls Colored Cards like "Total Spend", "Impressions")
+   ========================================= */
+.kpi-card {
+  height: 90%;
+  border-radius: 10px;
+  padding: 1.0rem;
+  color: white;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.kpi-card:hover {
+  box-shadow: 0 8px 16px -2px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+/* -- KPI Card Gradients -- */
+.kpi-card-primary {
+  background: linear-gradient(135deg, #5b45b0 0%, #483690 100%);
+}
+
+/* Purple */
+.kpi-card-success {
+  background: linear-gradient(135deg, #0d47a1 0%, #082d6b 100%);
+}
+
+/* Dark Blue */
+.kpi-card-info {
+  background: linear-gradient(135deg, #00897b 0%, #006056 100%);
+}
+
+/* Teal */
+.kpi-card-warning {
+  background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
+}
+
+/* Green */
+.kpi-card-purple {
+  background: linear-gradient(135deg, #d81b60 0%, #ad1457 100%);
+}
+
+/* Pink */
+.kpi-card-teal {
+  background: linear-gradient(135deg, #00acc1 0%, #00838f 100%);
+}
+
+/* Cyan */
+.kpi-card-pink {
+  background: linear-gradient(135deg, #8e24aa 0%, #6a1b9a 100%);
+}
+
+/* Violet */
+.kpi-card-orange {
+  background: linear-gradient(135deg, #f57c00 0%, #e65100 100%);
+}
+
+/* Orange */
+
+/* Light Color Variants for Content Marketing Cards */
+.kpi-card-l1 {
+  background: linear-gradient(135deg, #e9d5ff 0%, #d8b4fe 100%);
+  color: #6b21a8;
+}
+
+/* Light Purple/Lavender */
+.kpi-card-l2 {
+  background: linear-gradient(135deg, #bfdbfe 0%, #93c5fd 100%);
+  color: #1e40af;
+}
+
+/* Light Blue/Sky */
+.kpi-card-total {
+  background: linear-gradient(135deg, #a7f3d0 0%, #6ee7b7 100%);
+  color: #065f46;
+}
+
+/* Light Teal/Mint */
+.kpi-card-unfollowers {
+  background: linear-gradient(135deg, #fecdd3 0%, #fda4af 100%);
+  color: #991b1b;
+}
+
+/* Light Pink/Rose */
+
+/* -- KPI Card Content -- */
+.kpi-card-body {
+  position: relative;
+  z-index: 2;
+}
+
+.kpi-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  opacity: 0.9;
+  text-transform: capitalize;
+  display: block;
+}
+
+/* Override label color for light background cards */
+.kpi-card-l1 .kpi-label,
+.kpi-card-l2 .kpi-label,
+.kpi-card-total .kpi-label,
+.kpi-card-unfollowers .kpi-label {
+  color: inherit;
+  opacity: 0.8;
+}
+
+.kpi-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin: 0.4rem 0;
+}
+
+/* Override text color for light background cards */
+.kpi-card-l1 .kpi-value,
+.kpi-card-l2 .kpi-value,
+.kpi-card-total .kpi-value,
+.kpi-card-unfollowers .kpi-value {
+  color: inherit;
+}
+
+/* Default white text for dark background cards */
+.kpi-card-primary .kpi-value,
+.kpi-card-success .kpi-value,
+.kpi-card-info .kpi-value,
+.kpi-card-warning .kpi-value,
+.kpi-card-purple .kpi-value,
+.kpi-card-teal .kpi-value,
+.kpi-card-pink .kpi-value,
+.kpi-card-orange .kpi-value {
+  color: white;
+}
+
+.kpi-icon {
+  position: absolute;
+  right: 0.85rem;
+  top: 0.85rem;
+  font-size: 2rem;
+  opacity: 0.2;
+}
+
+/* Increase icon opacity for light background cards */
+.kpi-card-l1 .kpi-icon,
+.kpi-card-l2 .kpi-icon,
+.kpi-card-total .kpi-icon,
+.kpi-card-unfollowers .kpi-icon {
+  opacity: 0.15;
+}
+
+.kpi-subtitle,
+.kpi-change {
+  font-size: 0.75rem;
+  opacity: 0.8;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Override change indicator color for light background cards */
+.kpi-card-l1 .kpi-change,
+.kpi-card-l2 .kpi-change,
+.kpi-card-total .kpi-change,
+.kpi-card-unfollowers .kpi-change {
+  color: inherit;
+  opacity: 0.9;
+}
+
+.kpi-change-positive {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 2px 5px;
+  border-radius: 3px;
+}
+
+.kpi-change-negative {
+  background: rgba(255, 200, 200, 0.3);
+  padding: 2px 5px;
+  border-radius: 3px;
+  color: rgba(220, 38, 38, 1);
+}
+
+/* Override change indicator styles for light background cards */
+.kpi-card-l1 .kpi-change-positive,
+.kpi-card-l2 .kpi-change-positive,
+.kpi-card-total .kpi-change-positive,
+.kpi-card-unfollowers .kpi-change-positive {
+  background: rgba(0, 0, 0, 0.1);
+  color: inherit;
+  opacity: 0.9;
+}
+
+.kpi-card-l1 .kpi-change-negative,
+.kpi-card-l2 .kpi-change-negative,
+.kpi-card-total .kpi-change-negative,
+.kpi-card-unfollowers .kpi-change-negative {
+  background: rgba(239, 68, 68, 0.2);
+  color: rgba(220, 38, 38, 1);
+  opacity: 1;
+}
+
+.kpi-sparkle {
+  position: absolute;
+  top: 0.4rem;
+  left: 0.4rem;
+  font-size: 1rem;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* =========================================
+   5. REVENUE CARDS (Bottom Row)
+   ========================================= */
+.revenue-card {
+  height: 100%;
+  border-radius: 10px;
+  background: var(--card, #ffffff);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  color: var(--text, #1e293b);
+}
+
+.revenue-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.revenue-label {
+  color: var(--text, #64748b);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.revenue-value {
+  color: var(--text, #1e293b);
+  font-size: 1.25rem;
+  font-weight: 800;
+  margin: 0.4rem 0;
+}
+
+.revenue-value-highlight {
+  background: linear-gradient(135deg, #d81b60, #f57c00);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.revenue-icon {
+  font-size: 1.25rem;
+  float: right;
+  opacity: 0.5;
+}
+
+/* =========================================
+   6. CHARTS & GRAPHS
+   ========================================= */
+.chart-card {
+  background: var(--card, #ffffff);
+  border-radius: 10px;
+  padding: 1.2rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  height: 100%;
+  transition: all 0.2s ease;
+  color: var(--text, #1e293b);
+}
+
+.chart-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.chart-title {
+  color: var(--text, #1e293b);
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.chart-subtitle {
+  font-weight: 400;
+  color: var(--text, #64748b);
+  font-size: 0.8rem;
+  margin-left: auto;
+  opacity: 0.8;
+}
+
+.chart-emoji {
+  display: inline-block;
+  font-size: 1.25rem;
+}
+
+.chart-container {
+  min-height: 200px;
+  position: relative;
+}
+
+.chart-container-large {
+  min-height: 240px;
+  position: relative;
+  width: 100%;
+}
+
+/* Chart hover animations */
+.chart-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.chart-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Interactive chart elements */
+.recharts-bar-rectangle:hover {
+  opacity: 0.8;
+  filter: brightness(1.1);
+  transition: all 0.2s ease;
+}
+
+.recharts-area:hover {
+  opacity: 0.9;
+}
+
+/* Smooth chart animations */
+.recharts-wrapper {
+  transition: all 0.3s ease;
+}
+
+/* Tooltip animations */
+.recharts-tooltip-wrapper {
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
+.kpi-icon {
+  transition: transform 0.2s ease;
+}
+
+.kpi-card:hover .kpi-icon {
+  transform: scale(1.1);
+}
+
+/* Table Enhancements */
+.table tbody tr {
+  transition: background-color 0.2s ease;
+  border-left: 3px solid transparent;
+}
+
+.table tbody tr:hover {
+  background-color: rgba(103, 58, 183, 0.05);
+  border-left-color: #673ab7;
+}
+
+/* Theme-aware table styles */
+.table {
+  background: var(--card, #ffffff) !important;
+  color: var(--text, #1e293b) !important;
+}
+
+.table th {
+  background: var(--card, #ffffff) !important;
+  color: var(--text, #1e293b) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+.table td {
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  color: var(--text, #1e293b) !important;
+}
+
+/* =========================================
+   7. RESPONSIVE DESIGN (Mobile)
+   ========================================= */
+
+/* Extra Small Devices (phones, 320px and up) */
+@media (max-width: 576px) {
+  .dashboard-wrapper {
+    padding: 0.75rem;
+  }
+
+  .dashboard-header {
+    padding: 0.85rem 1rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .dashboard-title {
+    font-size: 1.1rem;
+  }
+
+  .dashboard-subtitle {
+    font-size: 0.7rem;
+  }
+
+  .filter-card {
+    padding: 0.75rem;
+  }
+
+  .filter-label {
+    font-size: 0.65rem;
+    margin-bottom: 0.3rem;
+  }
+
+  .filter-select {
+    font-size: 0.8rem;
+    padding: 0.45rem;
+  }
+
+  .kpi-card {
+    padding: 0.85rem;
+    height: auto;
+    min-height: 100px;
+  }
+
+  .kpi-value {
+    font-size: 1.15rem;
+  }
+
+  .kpi-label {
+    font-size: 0.7rem;
+  }
+
+  .kpi-icon {
+    font-size: 1.5rem;
+    right: 0.65rem;
+    top: 0.65rem;
+  }
+
+  .revenue-card {
+    padding: 0.85rem;
+  }
+
+  .revenue-value {
+    font-size: 1.1rem;
+  }
+
+  .chart-card {
+    padding: 1rem;
+  }
+
+  .chart-title {
+    font-size: 0.85rem;
+  }
+
+  /* Table responsive wrapper */
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    display: block;
+    width: 100%;
+  }
+
+  .table {
+    font-size: 0.7rem;
+    min-width: 800px; /* Force horizontal scroll on very small screens */
+  }
+
+  .table th,
+  .table td {
+    padding: 0.5rem 0.4rem;
+    white-space: nowrap;
+  }
+
+  .table th {
+    font-size: 0.65rem;
+  }
+
+  /* Stack filter columns on mobile */
+  .filter-row > .col-12 {
+    margin-bottom: 0.75rem;
+  }
+
+  /* Ensure refresh button is visible and doesn't overflow on mobile */
+  .filter-row > .col-12.col-md-auto.ms-md-auto {
+    flex: 1 1 100%;
+    margin-left: 0 !important;
+    width: 100%;
+    margin-top: 0.5rem;
+  }
+
+  .refresh-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Ensure filter card doesn't overflow on mobile */
+  .filter-card {
+    overflow-x: visible;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+/* Small Devices (tablets, 576px and up) */
+@media (min-width: 577px) and (max-width: 768px) {
+  .dashboard-wrapper {
+    padding: 1rem;
+  }
+
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.85rem;
+  }
+
+  .dashboard-title {
+    font-size: 1.25rem;
+  }
+
+  .kpi-value {
+    font-size: 1.35rem;
+  }
+
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table {
+    font-size: 0.75rem;
+  }
+
+  .table th,
+  .table td {
+    padding: 0.6rem 0.5rem;
+  }
+
+  /* Ensure filter card doesn't overflow on small tablets */
+  .filter-card {
+    overflow-x: auto;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Ensure refresh button is visible on small tablets */
+  .filter-row > .col-12.col-md-auto.ms-md-auto {
+    flex: 1 1 auto;
+    margin-left: auto !important;
+    margin-top: 0;
+  }
+}
+
+/* Medium Devices (tablets in landscape, 768px and up) */
+@media (min-width: 769px) and (max-width: 992px) {
+  .dashboard-wrapper {
+    padding: 1.25rem;
+  }
+
+  .kpi-value {
+    font-size: 1.45rem;
+  }
+
+  .table-responsive {
+    overflow-x: auto;
+  }
+
+  /* Ensure filter card doesn't overflow on medium tablets */
+  .filter-card {
+    overflow-x: auto;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+/* Large Devices (desktops, 992px and up) - default styles apply */
+
+/* Mobile-specific table improvements */
+@media (max-width: 992px) {
+  /* Ensure tables are scrollable horizontally */
+  .table-responsive {
+    position: relative;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 8px;
+  }
+
+  .table-responsive::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  .table-responsive::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+  }
+
+  .table-responsive::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+  }
+
+  .table-responsive::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+
+  /* Filter row improvements for tablets */
+  .filter-row {
+    flex-wrap: wrap;
+  }
+
+  .filter-row > .col-12.col-md-auto {
+    flex: 1 1 auto;
+    min-width: 150px;
+    max-width: 100%;
+  }
+
+  /* Ensure filter card doesn't overflow */
+  .filter-card {
+    overflow-x: auto;
+    max-width: 100%;
+  }
+
+  /* Ensure refresh button column wraps properly */
+  .filter-row > .col-12.col-md-auto.ms-md-auto {
+    flex: 1 1 100%;
+    margin-left: 0 !important;
+    margin-top: 0.75rem;
+  }
+}
+
+/* Touch-friendly improvements for mobile */
+@media (max-width: 768px) {
+  /* Increase touch target sizes */
+  .btn,
+  .refresh-btn,
+  .filter-select,
+  button {
+    min-height: 44px; /* iOS recommended touch target */
+    padding: 0.6rem 1rem;
+  }
+
+  /* Improve spacing for stacked elements */
+  .row.g-3 > * {
+    margin-bottom: 0.75rem;
+  }
+
+  /* Better card spacing */
+  .card {
+    margin-bottom: 1rem;
+  }
+
+  /* Chart containers */
+  .chart-container,
+  .chart-container-large {
+    min-height: 200px;
+  }
+
+  /* Ensure refresh button wraps on tablet */
+  .filter-row > .col-12.col-md-auto.ms-md-auto {
+    flex: 1 1 100%;
+    margin-left: 0 !important;
+    margin-top: 0.75rem;
+  }
+
+  /* Ensure filter card doesn't overflow on tablet */
+  .filter-card {
+    overflow-x: auto;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+/* Enhanced visual effects */
+.chart-card-body {
+  position: relative;
+  z-index: 2;
+}
+
+.filter-card {
+  transition: box-shadow 0.2s ease;
+}
+
+.filter-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}

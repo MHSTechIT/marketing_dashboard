@@ -58,7 +58,7 @@ const SHEET_ID      = process.env.GOOGLE_SHEET_ID  || '1RWOgyXVLZQvHJpSzRk1Vd02C
 const SHEET_TAB     = process.env.GOOGLE_SHEET_TAB || 'DW-live data';
 const VERIFY_TOKEN  = process.env.META_WEBHOOK_VERIFY_TOKEN || 'mhs_dw_sync_2025';
 const META_VERSION  = process.env.META_API_VERSION || 'v21.0';
-const SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const SYNC_INTERVAL = 60 * 1000; // 1 minute (safety-net poll; webhook delivers instantly)
 
 const STATE_FILE = path.join(__dirname, '..', 'data', 'leads-sync-state.json');
 
@@ -113,21 +113,49 @@ function findField(fields, pattern) {
   return '';
 }
 
+/**
+ * Convert Meta's UTC `created_time` (e.g. "2026-05-19T02:38:02+0000")
+ * to IST (Asia/Kolkata, UTC+5:30) and return { date, time } as the
+ * lead actually occurred locally — matching what Meta's Leads Center shows.
+ */
+function toIST(createdTime) {
+  if (!createdTime) return { date: '', time: '' };
+  const d = new Date(createdTime);
+  if (isNaN(d.getTime())) return { date: '', time: '' };
+  // en-CA → "YYYY-MM-DD"; en-GB + hour12:false → "HH:MM:SS"
+  const date = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+  const time = d.toLocaleTimeString('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    hour12: false,
+  });
+  return { date, time };
+}
+
 function metaLeadToRow(lead, formId) {
   const meta  = FORM_META[formId] || {};
   const fields = parseFields(lead.field_data || []);
 
-  const createdTime = lead.created_time || '';
-  const date = createdTime ? createdTime.split('T')[0] : '';
-  const timePart = createdTime.split('T')[1] || '';
-  const time = timePart.replace('Z', '').split('+')[0].split('.')[0];
+  const { date, time } = toIST(lead.created_time || '');
+
+  // Resolve name: full_name → first+last → any generic name field
+  const fullName  = fields.full_name  || findField(fields, /full.?name/i)  || '';
+  const firstName = fields.first_name || findField(fields, /first.?name/i) || '';
+  const lastName  = fields.last_name  || findField(fields, /last.?name/i)  || '';
+  const resolvedName = fullName
+    || (firstName || lastName ? `${firstName} ${lastName}`.trim() : '')
+    || findField(fields, /\bname\b/i)
+    || 'N/A';
+
+  // Resolve phone: Meta standard key is phone_number, also try phone
+  const resolvedPhone = fields.phone_number || fields.phone
+    || findField(fields, /phone/i) || 'N/A';
 
   return [
     date,
     time,
     String(lead.id || lead.lead_id || ''),
-    fields.full_name  || findField(fields, /full.?name/i)  || 'N/A',
-    fields.phone      || findField(fields, /phone/i)       || 'N/A',
+    resolvedName,
+    resolvedPhone,
     fields.city       || findField(fields, /city/i)        || '',
     fields.post_code  || findField(fields, /post.?code|zip/i) || '',
     findField(fields, /sugar/i),

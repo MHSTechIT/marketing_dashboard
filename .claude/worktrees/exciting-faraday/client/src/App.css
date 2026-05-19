@@ -1,0 +1,41 @@
+/* Theme colors */
+[data-theme='light'] {
+  --bg-color: #ffffff;
+  --text-color: #000000;
+  --primary: #007bff;
+}
+[data-theme='dark'] {
+  --bg-color: #1c1c1c;
+  --text-color: #f1f1f1;
+  --primary: #6c63ff;
+}
+[data-theme='green'] {
+  --bg-color: #e8f5e9;
+  --text-color: #1b5e20;
+  --primary: #2e7d32;
+}
+[data-theme='sunset'] {
+  --bg-color: #fff3e0;
+  --text-color: #e65100;
+  --primary: #fb8c00;
+}
+
+body[data-theme] {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+}
+
+/* Theme buttons */
+.theme-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid #ccc;
+}
+.theme-light { background-color: #fff; }
+.theme-dark { background-color: #333; }
+.theme-green { background-color: #4caf50; }
+.theme-sunset { background-color: #ff7043; }
+.theme-btn:hover {
+  transform: scale(1.1);
+}
