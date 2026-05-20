@@ -4546,8 +4546,10 @@ router.get("/leads/db", optionalAuthMiddleware, async (req, res) => {
         date: lead.date,
         time: lead.time,
         // Additional fields that frontend might expect
-        Street: 'N/A', // Not stored in DB currently, can be added later
-        City: 'N/A', // Not stored in DB currently, can be added later
+        Street: lead.street || lead.Street || 'N/A',
+        City: lead.city || lead.City || 'N/A',
+        SugarPoll: lead.SugarPoll || lead.sugar_poll || 'N/A',
+        sugar_poll: lead.sugar_poll || lead.SugarPoll || 'N/A',
         page_name: 'N/A', // Can be enriched from Meta API if needed
         campaign_name: lead.Campaign || 'N/A',
         ad_name: adName || 'N/A', // Use stored ad_name from DB, fallback to API if missing

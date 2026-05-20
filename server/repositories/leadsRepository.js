@@ -137,6 +137,13 @@ async function saveLeads(leads) {
         const adName = lead.ad_name || null;
         const sugarPoll = lead.SugarPoll ?? lead.sugar_poll ?? null;
         const leadIntel = lead.lead_intel ?? lead.LeadIntel ?? null;
+        // city/street: skip "N/A" sentinel — store NULL instead so DB filters
+        // (IS NOT NULL) work correctly and the dashboard shows empty rather
+        // than the literal string "N/A".
+        const cityRaw = lead.City ?? lead.city ?? null;
+        const streetRaw = lead.Street ?? lead.street ?? lead.address ?? null;
+        const city = (cityRaw && cityRaw !== 'N/A') ? String(cityRaw) : null;
+        const street = (streetRaw && streetRaw !== 'N/A') ? String(streetRaw) : null;
         
         // Validate: Skip conversion if timestamp already has timezone offset (+05:30)
         const hasOffset = hasTimezoneOffset(createdTime);
@@ -187,6 +194,8 @@ async function saveLeads(leads) {
           ad_name: adName,
           SugarPoll: sugarPoll,
           sugar_poll: sugarPoll,
+          city,
+          street,
           ...(leadIntel != null ? { lead_intel: leadIntel } : {}),
         };
         if (shape === 'mixed') return baseMixed;
@@ -204,6 +213,8 @@ async function saveLeads(leads) {
           created_time: createdTimeValue,
           ad_name: adName,
           sugar_poll: sugarPoll,
+          city,
+          street,
           ...(leadIntel != null ? { lead_intel: leadIntel } : {}),
         };
       });
@@ -395,6 +406,25 @@ async function fetchLeadsRawForShape(shape, campaignIdList, adIdList, formIdList
       }
     }
     data = [...merged.values()];
+
+    // IST-aware post-filter: date_char is stored as UTC date, but the dashboard
+    // displays IST and users select IST dates. Without this, leads at UTC late-
+    // evening (= next-IST-day early morning) leak into the previous day's filter.
+    // Example: created_time 2026-05-19T23:07Z → IST 2026-05-20 04:37 → must NOT
+    // appear in a "May 19" IST filter even though date_char='2026-05-19'.
+    const istDateOf = (row) => {
+      const t = row.TimeUtc || row.time_utc || row.created_time;
+      if (!t) return row.DateChar || '';
+      const d = new Date(t);
+      if (isNaN(d.getTime())) return row.DateChar || '';
+      return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    };
+    data = data.filter(r => {
+      const ist = istDateOf(r);
+      if (!ist) return true; // can't determine — keep
+      return ist >= dateFrom && ist <= dateTo;
+    });
+
     data.sort((a, b) => {
       const da = a.DateChar || '';
       const db = b.DateChar || '';
@@ -479,6 +509,10 @@ function mapLeadRowToApi(row) {
     SugarPoll: r.SugarPoll,
     sugar_poll: r.sugar_poll ?? r.SugarPoll,
     lead_intel: r.lead_intel,
+    city: r.city ?? r.City ?? null,
+    City: r.City ?? r.city ?? null,
+    street: r.street ?? r.Street ?? null,
+    Street: r.Street ?? r.street ?? null,
     time: r.TimeUtc,
     date: r.DateChar
   };

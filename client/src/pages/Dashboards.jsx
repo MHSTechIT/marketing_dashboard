@@ -1990,26 +1990,26 @@ export default function AdsDashboardBootstrap() {
     setFilteredLeadsLoading(true);
     setFilteredLeadsError(null);
     try {
-      // Use live Meta API endpoint (not database)
+      // Read from DB (same source as Total Leads Admin View). The live Meta
+      // endpoint /api/meta/leads relies on page-token discovery which is
+      // currently broken for 3 of 4 configured pages and drops the connection
+      // ("Failed to fetch"). DB has near-real-time data via the 15-min sync.
       const from = filteredLeadsTimeRange.startDate || null;
       const to = filteredLeadsTimeRange.endDate || null;
-      
-      // Build query parameters - use 'start' and 'end' to match backend API
+
       const params = new URLSearchParams();
       if (filteredLeadsForm) params.append('formId', filteredLeadsForm);
       if (filteredLeadsPage) params.append('pageId', filteredLeadsPage);
-      if (from) params.append('start', from);
-      if (to) params.append('end', to);
-      params.append('limit', '10000'); // request up to 10000 (server clamps 25-10000)
+      if (from) params.append('startDate', from);
+      if (to) params.append('endDate', to);
 
-      // Fetch from live Meta API endpoint
       const token = getAuthToken();
       const headers = { "Content-Type": "application/json" };
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
-      
-      const url = `${API_BASE}/api/meta/leads?${params.toString()}`;
+
+      const url = `${API_BASE}/api/meta/leads/db?${params.toString()}`;
       const response = await fetch(url, { headers });
       
       if (!response.ok) {

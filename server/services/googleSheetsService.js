@@ -94,14 +94,20 @@ async function appendRows(spreadsheetId, sheetName, rows) {
 
 /**
  * Read all values from a range (used to fetch existing lead IDs for dedup).
+ * Pass valueRenderOption='UNFORMATTED_VALUE' to read raw cell values — required
+ * for Lead ID dedup because big integers display as scientific notation
+ * ("1.4327E+15") in the default FORMATTED_VALUE mode.
  * @param {string} spreadsheetId
  * @param {string} range  e.g. "DW-live data!C:C"
- * @returns {Array<Array<string>>}
+ * @param {string} [valueRenderOption]
+ * @returns {Array<Array<string|number>>}
  */
-async function readRange(spreadsheetId, range) {
+async function readRange(spreadsheetId, range, valueRenderOption) {
   const sheets = await getSheetsClient();
-  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range });
+  const req = { spreadsheetId, range };
+  if (valueRenderOption) req.valueRenderOption = valueRenderOption;
+  const res = await sheets.spreadsheets.values.get(req);
   return res.data.values || [];
 }
 
-module.exports = { appendRows, readRange, colLetter };
+module.exports = { appendRows, readRange, colLetter, getSheetsClient };

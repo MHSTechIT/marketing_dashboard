@@ -150,10 +150,16 @@ function metaLeadToRow(lead, formId) {
   const resolvedPhone = fields.phone_number || fields.phone
     || findField(fields, /phone/i) || 'N/A';
 
+  // Lead ID: prepend "'" so USER_ENTERED stores as text. Without this, big
+  // integers get coerced to numbers and display as "1.4E+15", which breaks
+  // string-based dedup on subsequent reads (caused 134 duplicate rows).
+  const leadIdStr = String(lead.id || lead.lead_id || '');
+  const leadIdCell = leadIdStr ? "'" + leadIdStr : '';
+
   return [
     date,
     time,
-    String(lead.id || lead.lead_id || ''),
+    leadIdCell,
     resolvedName,
     resolvedPhone,
     fields.city       || findField(fields, /city/i)        || '',
@@ -215,6 +221,23 @@ async function fetchFromMeta(formId, sinceTime = null) {
 
 let _syncRunning = false;
 
+// Single-writer mutex: webhook deliveries and poll appends share this lock so
+// that "read existingIds → check → appendRows" runs atomically. Without it, a
+// webhook can append a lead between the poll's pre-append recheck and its own
+// appendRows call (or two webhooks for the same leadgen_id can both pass dedup).
+// The lock is in-memory per Node process — fine for our single-server setup.
+let _writerLock = Promise.resolve();
+function withWriterLock(fn) {
+  const prev = _writerLock;
+  let release;
+  const next = new Promise(r => { release = r; });
+  _writerLock = prev.then(() => next);
+  return prev.then(async () => {
+    try { return await fn(); }
+    finally { release(); }
+  });
+}
+
 async function runSync(fullBackfill = false) {
   if (_syncRunning) { console.log('[LeadsSync] Already running, skipping'); return { skipped: true }; }
   _syncRunning = true;
@@ -222,15 +245,21 @@ async function runSync(fullBackfill = false) {
   try {
     const state = readState();
 
-    // Read existing Lead IDs from sheet (column C) once — used for all 3 forms
+    // Read existing Lead IDs from sheet (column C). UNFORMATTED_VALUE so big
+    // integers come back as digits — without this, numbers display as
+    // scientific notation ("1.4327E+15") in the default mode and dedup fails.
     await ensureHeaders();
-    const existingCol = await readRange(SHEET_ID, `${SHEET_TAB}!C:C`);
+    const existingCol = await readRange(SHEET_ID, `${SHEET_TAB}!C:C`, 'UNFORMATTED_VALUE');
     const existingIds = new Set(
-      existingCol.flat().map(v => String(v || '').trim()).filter(Boolean)
+      existingCol.flat().map(v => String(v == null ? '' : v).trim()).filter(Boolean)
     );
     existingIds.delete('Lead ID');
 
-    let totalPushed = 0;
+    // Phase 1: fetch from all forms into one buffer so we can globally sort
+    // before appending. Without this, Form A's batch is appended above Form B's
+    // even when Form B has older leads in the same cycle.
+    const buffered = []; // { lead, formId, row }
+    const perFormMostRecent = {};
 
     for (const form of TARGET_FORMS) {
       const { formId, formName } = form;
@@ -254,40 +283,80 @@ async function runSync(fullBackfill = false) {
 
       console.log(`[LeadsSync] Form ${formId} — fetched ${leads.length} leads`);
 
-      // Build rows, deduplicate, oldest-first for sheet ordering
-      const newRows = leads
-        .map(l => metaLeadToRow(l, formId))
-        .filter(r => r[2] && !existingIds.has(r[2]))
-        .reverse();
-
-      // Add newly pushed IDs to set to avoid cross-form duplicates in same run
-      newRows.forEach(r => existingIds.add(r[2]));
-
-      if (newRows.length === 0) {
-        console.log(`[LeadsSync] Form ${formId} — all already in sheet`);
-        state[formId] = { ...state[formId], lastRun: new Date().toISOString() };
-        continue;
+      for (const lead of leads) {
+        // Raw lead ID for dedup (matches the unformatted value the sheet returns).
+        // row[2] now has a leading apostrophe to force text storage — don't dedup on it.
+        const leadId = String(lead.id || lead.lead_id || '').trim();
+        if (!leadId || existingIds.has(leadId)) continue;
+        existingIds.add(leadId); // also blocks intra-cycle dupes across forms
+        const row = metaLeadToRow(lead, formId);
+        buffered.push({ lead, formId, row });
       }
 
-      // Append in chunks
-      const CHUNK = 500;
-      for (let i = 0; i < newRows.length; i += CHUNK) {
-        await appendRows(SHEET_ID, SHEET_TAB, newRows.slice(i, i + CHUNK));
-      }
-
-      // Update checkpoint to the most recent lead's created_time
+      // Track most-recent created_time per form for checkpoint advancement
       const mostRecent = leads.reduce(
         (max, l) => new Date(l.created_time) > new Date(max) ? l.created_time : max,
         leads[0].created_time
       );
-      state[formId] = {
-        lastSyncTime: mostRecent,
-        lastRun: new Date().toISOString(),
-        totalPushed: (state[formId]?.totalPushed || 0) + newRows.length,
-      };
+      perFormMostRecent[formId] = mostRecent;
+    }
 
-      console.log(`[LeadsSync] Form ${formId} — pushed ${newRows.length} new rows ✓`);
-      totalPushed += newRows.length;
+    // Phase 2: globally sort by created_time (oldest first) so the sheet
+    // appends in true chronological order regardless of which form produced
+    // the lead.
+    buffered.sort((a, b) =>
+      new Date(a.lead.created_time).getTime() - new Date(b.lead.created_time).getTime()
+    );
+
+    // Re-read column C and append under the writer mutex so concurrent
+    // webhook calls cannot squeeze a duplicate between our check and write.
+    let finalBuffered = buffered;
+    let totalPushed = 0;
+    const pushedByForm = {};
+
+    if (buffered.length > 0) {
+      await withWriterLock(async () => {
+        const freshCol = await readRange(SHEET_ID, `${SHEET_TAB}!C:C`, 'UNFORMATTED_VALUE');
+        const freshIds = new Set(
+          freshCol.flat().map(v => String(v == null ? '' : v).trim()).filter(Boolean)
+        );
+        freshIds.delete('Lead ID');
+        finalBuffered = buffered.filter(b => {
+          const lid = String(b.lead.id || b.lead.lead_id || '').trim();
+          return lid && !freshIds.has(lid);
+        });
+        const dropped = buffered.length - finalBuffered.length;
+        if (dropped > 0) {
+          console.log(`[LeadsSync] Pre-append recheck dropped ${dropped} lead(s) already written (webhook race)`);
+        }
+
+        const sortedRows = finalBuffered.map(b => b.row);
+        for (const b of finalBuffered) pushedByForm[b.formId] = (pushedByForm[b.formId] || 0) + 1;
+        totalPushed = sortedRows.length;
+
+        if (sortedRows.length > 0) {
+          const CHUNK = 500;
+          for (let i = 0; i < sortedRows.length; i += CHUNK) {
+            await appendRows(SHEET_ID, SHEET_TAB, sortedRows.slice(i, i + CHUNK));
+          }
+          for (const [formId, count] of Object.entries(pushedByForm)) {
+            console.log(`[LeadsSync] Form ${formId} — pushed ${count} new rows ✓`);
+          }
+        }
+      });
+    }
+
+    // Advance per-form checkpoints (only forms that actually returned leads)
+    const nowIso = new Date().toISOString();
+    for (const form of TARGET_FORMS) {
+      const formId = form.formId;
+      if (perFormMostRecent[formId]) {
+        state[formId] = {
+          lastSyncTime: perFormMostRecent[formId],
+          lastRun: nowIso,
+          totalPushed: (state[formId]?.totalPushed || 0) + (pushedByForm[formId] || 0),
+        };
+      }
     }
 
     writeState(state);
@@ -307,7 +376,6 @@ async function runSync(fullBackfill = false) {
 function startScheduler() {
   // Run immediately on startup
   runSync(false).catch(e => console.error('[LeadsSync] Startup sync error:', e.message));
-  // Then every 5 minutes
   setInterval(() => {
     runSync(false).catch(e => console.error('[LeadsSync] Scheduled sync error:', e.message));
   }, SYNC_INTERVAL);
@@ -348,8 +416,21 @@ router.post('/webhook', async (req, res) => {
           );
           data.id = leadgenId;
           await ensureHeaders();
-          await appendRows(SHEET_ID, SHEET_TAB, [metaLeadToRow(data, formId)]);
-          console.log(`[LeadsSync] Webhook lead ${leadgenId} written ✓`);
+          // Dedup + write under the shared writer mutex so we can't race with
+          // (a) the poll's append step, or (b) a second webhook delivery for
+          // the same leadgen_id arriving concurrently.
+          await withWriterLock(async () => {
+            const existing = await readRange(SHEET_ID, `${SHEET_TAB}!C:C`, 'UNFORMATTED_VALUE');
+            const existingIds = new Set(
+              existing.flat().map(v => String(v == null ? '' : v).trim()).filter(Boolean)
+            );
+            if (existingIds.has(leadgenId)) {
+              console.log(`[LeadsSync] Webhook lead ${leadgenId} already in sheet, skipping`);
+              return;
+            }
+            await appendRows(SHEET_ID, SHEET_TAB, [metaLeadToRow(data, formId)]);
+            console.log(`[LeadsSync] Webhook lead ${leadgenId} written ✓`);
+          });
         } catch (e) { console.error(`[LeadsSync] Webhook lead ${leadgenId} failed:`, e.message); }
       }
     }

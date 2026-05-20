@@ -9,7 +9,8 @@ const { signToken, hashPassword, comparePassword, authMiddleware } = require('./
 const app = express();
 app.use(cors({
   origin: [
-    'http://localhost:3000',
+    /^http:\/\/localhost:\d+$/,
+    /^http:\/\/127\.0\.0\.1:\d+$/,
     'https://final-dashboard-gxau.vercel.app',
     /https:\/\/.*\.vercel\.app$/,
     /https:\/\/.*\.onrender\.com$/
@@ -49,7 +50,7 @@ app.use("/api/youtube", youtubeInsightsRoutes);
 // Leads → Google Sheets real-time sync (webhook + scheduler + backfill)
 const leadsSyncRoutes = require("./routes/leadsSync");
 app.use("/api/leads-sync", leadsSyncRoutes);
-// Start 5-minute auto-sync: runs immediately on boot then every 5 min
+// Start auto-sync: runs immediately on boot then every SYNC_INTERVAL
 leadsSyncRoutes.startScheduler();
 
 app.get("/", (req, res) => {

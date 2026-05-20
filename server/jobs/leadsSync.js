@@ -26,35 +26,53 @@ function getSystemToken() {
  * @param {string} pageId - The Meta page ID
  * @returns {Promise<string>} - The page access token
  */
-async function getPageAccessToken(pageId) {
-  // 1. Per-page env var (most reliable for multi-page setups): META_PAGE_TOKEN_<pageId>
+/**
+ * Token strategy for leads sync:
+ *   - /{pageId}/leadgen_forms (form discovery) strictly requires a Page Access
+ *     Token. System User tokens work for owned pages; user tokens always 401.
+ *   - /{formId}/leads (lead fetch) accepts page OR user tokens, but the user
+ *     token reliably returns ad_id/campaign_id attribution while page tokens
+ *     often strip them.
+ * Returns { discoveryToken, leadsToken } so each phase uses the right one.
+ */
+async function getPageTokens(pageId) {
   const perPageEnv = (process.env[`META_PAGE_TOKEN_${pageId}`] || '').trim();
-  if (perPageEnv) return perPageEnv;
-
-  // 2. Single-page env var when pageId matches META_PAGE_ID
   const singlePageId = (process.env.META_PAGE_ID || '').trim();
   const singlePageToken = (process.env.META_PAGE_ACCESS_TOKEN || '').trim();
-  if (singlePageToken && singlePageId === pageId) return singlePageToken;
+  const userToken = (process.env.META_ACCESS_TOKEN || '').trim();
+  const systemToken = (process.env.META_SYSTEM_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN || '').trim();
 
-  // 3. Exchange system token via Graph API
-  try {
-    const systemToken = getSystemToken();
-    const response = await axios.get(
-      `https://graph.facebook.com/${META_API_VERSION}/${pageId}`,
-      { params: { fields: 'access_token', access_token: systemToken }, timeout: 30000 }
-    );
-    if (response.data?.access_token) return response.data.access_token;
-  } catch (error) {
-    console.warn(`[LeadsSync] Could not fetch page token via Graph for page ${pageId}: ${error.response?.data?.error?.message || error.message}`);
+  // Discovery: prefer real page token > system token > exchange via Graph
+  let discoveryToken = perPageEnv ||
+    (singlePageToken && singlePageId === pageId ? singlePageToken : '') ||
+    systemToken;
+
+  if (!perPageEnv && !singlePageToken && !systemToken) {
+    try {
+      const r = await axios.get(
+        `https://graph.facebook.com/${META_API_VERSION}/${pageId}`,
+        { params: { fields: 'access_token', access_token: systemToken }, timeout: 30000 }
+      );
+      if (r.data?.access_token) discoveryToken = r.data.access_token;
+    } catch (e) {
+      console.warn(`[LeadsSync] Token exchange failed for page ${pageId}: ${e.response?.data?.error?.message || e.message}`);
+    }
   }
 
-  // 4. Fallback to user token
-  const metaAccess = (process.env.META_ACCESS_TOKEN || '').trim();
-  if (metaAccess) return metaAccess;
+  // Leads fetch: prefer user token (returns full attribution), fall back to discovery token
+  const leadsToken = userToken || discoveryToken;
 
-  throw new Error(
-    `No page access token for page ${pageId}. Set META_PAGE_TOKEN_${pageId} in server/.env`
-  );
+  if (!discoveryToken && !leadsToken) {
+    throw new Error(`No access token available for page ${pageId}. Set META_ACCESS_TOKEN or META_PAGE_TOKEN_${pageId} in server/.env`);
+  }
+
+  return { discoveryToken, leadsToken };
+}
+
+// Back-compat shim — some callers still expect a single token.
+async function getPageAccessToken(pageId) {
+  const { leadsToken } = await getPageTokens(pageId);
+  return leadsToken;
 }
 
 function sleep(ms) {
@@ -185,21 +203,23 @@ function buildLeadsRelativeUrl(formId, { fields, limit, after, since, until } = 
  * Fetch leads from Meta API for a given page and date range
  */
 async function fetchLeadsFromMeta(pageId, startDate, endDate) {
-  // leadgen_forms and {form}/leads both require a Page Access Token on many apps (#190 with a user token).
-  const pageAccessToken = await getPageAccessToken(pageId);
+  // /leadgen_forms requires a real Page/System token; /{form}/leads is happier
+  // with the user token (returns ad_id/campaign_id attribution). See getPageTokens.
+  const { discoveryToken, leadsToken } = await getPageTokens(pageId);
 
   // Convert date range to Unix timestamps for Meta API
   const startTimestamp = Math.floor(startDate.getTime() / 1000);
   const endTimestamp = Math.floor(endDate.getTime() / 1000);
-  
+
   let allLeads = [];
-  
+
   try {
     const maxPagesPerForm = 50;
     const leadsFields = "ad_id,campaign_id,created_time,campaign_name,ad_name,field_data";
     const leadsLimit = 2000;
 
-    console.time('[LeadsSync] Fetch forms list');
+    const formsTimerLabel = `[LeadsSync] Fetch forms list ${pageId}`;
+    console.time(formsTimerLabel);
     const formsUrl = `https://graph.facebook.com/${META_API_VERSION}/${pageId}/leadgen_forms`;
     const formsFields = "id,locale,name,page_id,created_time";
 
@@ -211,15 +231,15 @@ async function fetchLeadsFromMeta(pageId, startDate, endDate) {
       let responseData;
       if (formsPageCount === 0) {
         const formsResponse = await axios.get(formsUrl, {
-          headers: { Authorization: `Bearer ${pageAccessToken}` },
+          headers: { Authorization: `Bearer ${discoveryToken}` },
           params: { fields: formsFields, limit: 100 },
           timeout: 60000,
         });
         responseData = formsResponse.data;
-       
+
       } else {
         const nextResponse = await axios.get(nextUrl, {
-          headers: { Authorization: `Bearer ${pageAccessToken}` },
+          headers: { Authorization: `Bearer ${discoveryToken}` },
           timeout: 60000,
         });
         responseData = nextResponse.data;
@@ -236,7 +256,7 @@ async function fetchLeadsFromMeta(pageId, startDate, endDate) {
       }
     } while (nextUrl && formsPageCount < 50);
 
-    console.timeEnd('[LeadsSync] Fetch forms list');
+    console.timeEnd(formsTimerLabel);
 
     // Map formId -> form info (for output mapping)
     const formsById = new Map();
@@ -296,7 +316,7 @@ async function fetchLeadsFromMeta(pageId, startDate, endDate) {
         };
       });
 
-      const batchResponses = await postGraphBatch(pageAccessToken, batch);
+      const batchResponses = await postGraphBatch(leadsToken, batch);
       
       // Log raw batch response structure for debugging (only for first batch)
       if (activeForms.length === allFormIds.length) {
