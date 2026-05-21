@@ -138,9 +138,6 @@ export default function MetaSettings() {
     setMessage({ type: "", text: "" });
 
     try {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/cab85f09-d2ee-4a04-8381-ae9f6766f965',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MetaSettings.jsx:72',message:'handleSubmit called',data:{hasFormData:!!formData,appId:formData.appId?formData.appId.substring(0,5)+'...':null,adAccountId:formData.adAccountId?formData.adAccountId.substring(0,5)+'...':null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
 
       if (!isAuthenticated) {
         setMessage({ type: "error", text: "Please log in to save credentials" });
@@ -149,9 +146,6 @@ export default function MetaSettings() {
       }
 
       const token = getToken();
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/cab85f09-d2ee-4a04-8381-ae9f6766f965',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MetaSettings.jsx:78',message:'Token retrieved',data:{hasToken:!!token,tokenLength:token?token.length:0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
 
       if (!token) {
         setIsAuthenticated(false);
@@ -172,9 +166,6 @@ export default function MetaSettings() {
         Authorization: `Bearer ${token}`,
       };
 
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/cab85f09-d2ee-4a04-8381-ae9f6766f965',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MetaSettings.jsx:93',message:'Before fetch request',data:{url:requestUrl,apiBase:API_BASE,method:'POST',hasBody:!!requestBody,bodyLength:requestBody.length,hasAuthHeader:!!requestHeaders.Authorization},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
 
       const res = await fetch(requestUrl, {
         method: "POST",
@@ -182,9 +173,6 @@ export default function MetaSettings() {
         body: requestBody,
       });
 
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/cab85f09-d2ee-4a04-8381-ae9f6766f965',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MetaSettings.jsx:100',message:'After fetch response',data:{status:res.status,statusText:res.statusText,ok:res.ok,headers:Object.fromEntries(res.headers.entries())},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
 
       // Handle authentication errors
       if (res.status === 401 || res.status === 403) {
@@ -197,13 +185,7 @@ export default function MetaSettings() {
       let data;
       try {
         data = await res.json();
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/cab85f09-d2ee-4a04-8381-ae9f6766f965',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MetaSettings.jsx:107',message:'Response JSON parsed',data:{hasData:!!data,error:data.error,success:data.success},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
       } catch (parseError) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/cab85f09-d2ee-4a04-8381-ae9f6766f965',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MetaSettings.jsx:111',message:'JSON parse error',data:{error:parseError.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
         throw parseError;
       }
 
@@ -220,9 +202,6 @@ export default function MetaSettings() {
         setMessage({ type: "error", text: data.error || "Failed to save credentials" });
       }
     } catch (error) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/cab85f09-d2ee-4a04-8381-ae9f6766f965',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MetaSettings.jsx:127',message:'Catch block - Network error',data:{errorName:error.name,errorMessage:error.message,errorStack:error.stack?.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       
       // More detailed error message
       let errorMessage = "Network error. Please try again.";

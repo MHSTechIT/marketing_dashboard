@@ -135,6 +135,8 @@ async function saveLeads(leads) {
         const createdTime = lead.created_time || lead.TimeUtc || lead.Time || null;
         const campaign = lead.Campaign || lead.campaign_name || null;
         const adName = lead.ad_name || null;
+        const formNameRaw = lead.form_name ?? lead.formName ?? null;
+        const formName = (formNameRaw && formNameRaw !== 'N/A') ? String(formNameRaw) : null;
         const sugarPoll = lead.SugarPoll ?? lead.sugar_poll ?? null;
         const leadIntel = lead.lead_intel ?? lead.LeadIntel ?? null;
         // city/street: skip "N/A" sentinel — store NULL instead so DB filters
@@ -192,6 +194,7 @@ async function saveLeads(leads) {
           page_id: pageId,
           created_time: createdTimeValue,
           ad_name: adName,
+          form_name: formName,
           SugarPoll: sugarPoll,
           sugar_poll: sugarPoll,
           city,
@@ -212,6 +215,7 @@ async function saveLeads(leads) {
           page_id: pageId,
           created_time: createdTimeValue,
           ad_name: adName,
+          form_name: formName,
           sugar_poll: sugarPoll,
           city,
           street,
@@ -224,13 +228,44 @@ async function saveLeads(leads) {
           ? 'Id, lead_id, Name, Phone, TimeUtc, DateChar, Campaign'
           : 'id, lead_id, name, phone, time_utc, date_char, campaign';
 
-      const { data, error } = await supabase
-        .from(tableName)
-        .upsert(transformedBatch, {
-          onConflict: 'lead_id',
-          ignoreDuplicates: false
-        })
-        .select(selectCols);
+      // Transient-network resilience: Supabase/PostgREST connections can drop
+      // mid-request (UND_ERR_SOCKET "other side closed", "fetch failed"). Retry a
+      // few times with backoff so a single network blip does not fail the whole
+      // page sync (which would block the leads-sync cursor from advancing).
+      let data, error;
+      for (let attempt = 1; attempt <= 4; attempt++) {
+        ({ data, error } = await supabase
+          .from(tableName)
+          .upsert(transformedBatch, { onConflict: 'lead_id', ignoreDuplicates: false })
+          .select(selectCols));
+        const msg = error?.message || error?.details || '';
+        const transient = /fetch failed|UND_ERR_SOCKET|other side closed|ECONNRESET|ETIMEDOUT|socket hang up|network/i.test(msg);
+        if (!error || !transient || attempt === 4) break;
+        const wait = 500 * attempt;
+        console.warn(`[LeadsRepository] Transient upsert error (attempt ${attempt}/4), retrying in ${wait}ms: ${msg.split('\n')[0]}`);
+        await new Promise(r => setTimeout(r, wait));
+      }
+
+      // Resilience: if an optional column (city/street/form_name) hasn't been
+      // added to the table yet, Supabase rejects the WHOLE batch with
+      // "Could not find the 'X' column". Rather than failing the entire sync,
+      // strip the offending optional columns and retry so core lead data still
+      // saves. Once the migration is applied these columns persist normally.
+      if (error && /Could not find the '.*' column|column .* does not exist|schema cache/i.test(error.message || '')) {
+        const OPTIONAL_COLS = ['city', 'street', 'form_name'];
+        const missing = OPTIONAL_COLS.filter(c => (error.message || '').includes(`'${c}'`) || (error.message || '').includes(` ${c} `));
+        const toStrip = missing.length > 0 ? missing : OPTIONAL_COLS;
+        console.warn(`[LeadsRepository] Optional column(s) missing in "${tableName}" (${toStrip.join(', ')}); retrying without them. Run the city/street/form_name migration to persist these fields.`);
+        const stripped = transformedBatch.map(row => {
+          const copy = { ...row };
+          for (const c of toStrip) delete copy[c];
+          return copy;
+        });
+        ({ data, error } = await supabase
+          .from(tableName)
+          .upsert(stripped, { onConflict: 'lead_id', ignoreDuplicates: false })
+          .select(selectCols));
+      }
 
       if (error) {
         console.error('[LeadsRepository] Error upserting leads batch:', error);
@@ -513,6 +548,7 @@ function mapLeadRowToApi(row) {
     City: r.City ?? r.city ?? null,
     street: r.street ?? r.Street ?? null,
     Street: r.Street ?? r.street ?? null,
+    form_name: r.form_name ?? null,
     time: r.TimeUtc,
     date: r.DateChar
   };

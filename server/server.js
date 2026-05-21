@@ -66,6 +66,47 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+// Deep health check — surfaces the failure modes that previously failed silently:
+// missing DB columns/tables, and a stale leads-sync cursor. Hit /api/health/deep.
+app.get("/api/health/deep", async (req, res) => {
+  const checks = [];
+  const add = (name, ok, detail) => checks.push({ name, ok, ...(detail ? { detail } : {}) });
+  try {
+    if (!supabase) {
+      return res.status(500).json({ status: "error", error: "Supabase not configured" });
+    }
+
+    // Required tables / columns (select the specific columns so a missing column errors).
+    const required = [
+      ["leads", "city, street, form_name"],
+      ["lead_scores", "id, score, tier"],
+      ["campaign_saturation_log", "id, status"],
+      ["creative_fatigue_log", "id, status"],
+      ["unique_leads", "id, phone"],
+      ["meta_insights", "id"],
+    ];
+    for (const [tbl, cols] of required) {
+      const { error } = await supabase.from(tbl).select(cols, { head: true, count: "exact" });
+      add(`table:${tbl}`, !error, error ? error.message : undefined);
+    }
+
+    // Leads-sync cursor freshness (should advance roughly every 15 min).
+    try {
+      const { data } = await supabase.from("JobState").select("JobValue, UpdatedAt").eq("JobKey", "lastSuccessfulLeadsSyncUtc").maybeSingle();
+      const last = data?.JobValue ? new Date(data.JobValue) : null;
+      const ageMin = last ? Math.round((Date.now() - last.getTime()) / 60000) : null;
+      add("leadsSyncCursor", ageMin != null && ageMin < 60, last ? `last success ${ageMin} min ago` : "no cursor yet");
+    } catch (e) {
+      add("leadsSyncCursor", false, e.message);
+    }
+
+    const allOk = checks.every((c) => c.ok);
+    res.status(allOk ? 200 : 503).json({ status: allOk ? "ok" : "degraded", timestamp: new Date().toISOString(), checks });
+  } catch (err) {
+    res.status(500).json({ status: "error", error: err.message, checks });
+  }
+});
+
 // Manual trigger for DW leads → Google Sheet sync
 app.post("/api/dw-sync/trigger", async (req, res) => {
   res.json({ status: "started", message: "DW sync triggered — check server logs." });
@@ -730,20 +771,19 @@ app.get('/api/campaigns', async (req, res) => {
       return res.status(500).json({ error: 'Supabase not configured' });
     }
 
-    // Get distinct campaigns from ads table
-    // Note: Table name is 'Ads' (capitalized) in Supabase
+    // Distinct campaign names from the live meta_campaigns cache (the legacy
+    // 'Ads' table is no longer populated — Meta data now lives in meta_campaigns/
+    // meta_ads/meta_insights).
     const { data, error } = await supabase
-      .from('Ads')
-      .select('Campaign');
+      .from('meta_campaigns')
+      .select('name');
 
     if (error) {
       console.error('Error fetching campaigns:', error);
       return res.status(500).json({ error: 'Database error: ' + error.message });
     }
 
-    // Extract unique campaign names
-    // Note: Column name is 'Campaign' (capitalized)
-    const campaigns = [...new Set((data || []).map(x => x.Campaign).filter(Boolean))].sort();
+    const campaigns = [...new Set((data || []).map(x => x.name).filter(Boolean))].sort();
     res.json(campaigns);
   } catch (err) {
     console.error('Error fetching campaigns:', err);

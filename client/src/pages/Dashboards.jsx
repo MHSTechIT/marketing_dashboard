@@ -405,9 +405,6 @@ const fetchDashboardData = async ({ days = 30, from = null, to = null, campaignI
     if (useLive) {
       url += '&live=1&refresh=1';
     }
-    // #region agent log
-    fetch('http://127.0.0.1:7244/ingest/a31de4bd-79e0-4784-8d49-20b7d56ddf12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Dashboards.jsx:fetchDashboardData',message:'insights request params',data:{from,to,campaignIds:campaignIds.slice(0,3),adIds:adIds.slice(0,3),allCampaigns,allAds,adAccountId,tzOffsetMin:new Date().getTimezoneOffset()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H5'})}).catch(()=>{});
-    // #endregion
 
     if (adAccountId) {
       url += `&ad_account_id=${encodeURIComponent(adAccountId)}`;
@@ -5975,12 +5972,41 @@ export default function AdsDashboardBootstrap() {
                           <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#94a3b8', flexShrink: 0 }} />
                           <span style={{ flex: 1 }}>Select a Form</span>
                         </div>
+                        {/* Legend */}
+                        <div style={{
+                          padding: '5px 12px', fontSize: '0.6rem', color: '#64748b',
+                          display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center',
+                          borderBottom: '1px solid var(--border-color, #e2e8f0)', backgroundColor: 'rgba(0,0,0,0.02)',
+                        }}>
+                          <span title="Active form">⚡ Active</span>
+                          <span title="Leads synced to dashboard">✅ Has leads</span>
+                          <span title="No leads">❌ None</span>
+                          <span title="Meta has leads not yet synced — run a backfill">⚠️ Sync issue</span>
+                          <span style={{ color: '#94a3b8' }}>(count = synced/Meta)</span>
+                        </div>
                         {filteredLeadsForms.map((form) => {
-                          const isActive = String(form.status || '').toUpperCase() === 'ACTIVE';
+                          const isActive = form.active != null ? !!form.active : String(form.status || '').toUpperCase() === 'ACTIVE';
                           const isSelected = filteredLeadsForm === form.id;
+                          const metaCount = form.leads_count != null ? Number(form.leads_count) : null;
+                          const dbCount = form.synced_count != null ? Number(form.synced_count) : null;
+                          // Derive lead status (server provides lead_status; fall back if absent)
+                          const leadStatus = form.lead_status
+                            || (metaCount != null && metaCount > 0 && (dbCount || 0) === 0 ? 'sync_issue'
+                                : (dbCount || 0) > 0 ? 'has_leads' : 'no_leads');
+                          const ind = leadStatus === 'has_leads'
+                            ? { icon: '✅', label: 'Leads', color: '#166534', bg: '#dcfce7', bd: '#86efac' }
+                            : leadStatus === 'sync_issue'
+                              ? { icon: '⚠️', label: 'Sync', color: '#92400e', bg: '#fef3c7', bd: '#fcd34d' }
+                              : { icon: '❌', label: 'None', color: '#64748b', bg: '#f1f5f9', bd: '#cbd5e1' };
+                          const countText = leadStatus === 'sync_issue'
+                            ? `${dbCount}/${metaCount}`
+                            : (dbCount != null ? String(dbCount) : (metaCount != null ? String(metaCount) : ''));
+                          const tip = `${isActive ? 'Active ⚡' : 'Inactive'} · Meta: ${metaCount != null ? metaCount : '?'} lead(s) · Synced to DB: ${dbCount != null ? dbCount : '?'}`
+                            + (leadStatus === 'sync_issue' ? ' · ⚠️ Meta has leads not yet in the dashboard (run a backfill)' : '');
                           return (
                             <div
                               key={form.id}
+                              title={tip}
                               onClick={() => { setFilteredLeadsForm(form.id); setFormDropdownOpen(false); }}
                               style={{
                                 padding: '7px 12px', cursor: 'pointer', fontSize: '0.8rem',
@@ -5992,24 +6018,29 @@ export default function AdsDashboardBootstrap() {
                               onMouseEnter={e => { if (!isSelected) e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.04)'; }}
                               onMouseLeave={e => { if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent'; }}
                             >
-                              {/* Status dot */}
-                              <span style={{
-                                width: '7px', height: '7px', borderRadius: '50%', flexShrink: 0,
-                                backgroundColor: isActive ? '#22c55e' : '#94a3b8',
-                              }} />
+                              {/* Active indicator: ⚡ for active, grey dot otherwise */}
+                              <span style={{ width: '14px', flexShrink: 0, textAlign: 'center', fontSize: '0.7rem' }} title={isActive ? 'Active form ⚡' : 'Inactive form'}>
+                                {isActive ? '⚡' : <span style={{ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#94a3b8' }} />}
+                              </span>
+                              {/* Lead-status icon */}
+                              <span style={{ flexShrink: 0, fontSize: '0.78rem' }}>{ind.icon}</span>
                               {/* Form name */}
                               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {form.name}
                               </span>
-                              {/* Status badge */}
+                              {/* Lead count */}
+                              {countText !== '' && (
+                                <span style={{ fontSize: '0.66rem', fontWeight: 600, color: ind.color, flexShrink: 0 }}>
+                                  {countText}
+                                </span>
+                              )}
+                              {/* Status pill */}
                               <span style={{
-                                fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.05em',
+                                fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.04em',
                                 padding: '2px 6px', borderRadius: '20px', flexShrink: 0,
-                                backgroundColor: isActive ? '#dcfce7' : '#f1f5f9',
-                                color: isActive ? '#166534' : '#64748b',
-                                border: `1px solid ${isActive ? '#86efac' : '#cbd5e1'}`,
+                                backgroundColor: ind.bg, color: ind.color, border: `1px solid ${ind.bd}`,
                               }}>
-                                {isActive ? 'ACTIVE' : 'INACTIVE'}
+                                {ind.label}
                               </span>
                             </div>
                           );

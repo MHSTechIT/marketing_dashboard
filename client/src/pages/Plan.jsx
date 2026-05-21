@@ -5,8 +5,19 @@ import './Plan.css';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:4000';
 
+function getAuthToken() {
+    try {
+        const STORAGE_KEY = process.env.REACT_APP_STORAGE_KEY || 'app_auth';
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) return JSON.parse(stored).token || null;
+    } catch (e) {
+        console.error('Error getting token:', e);
+    }
+    return null;
+}
+
 function getAuthHeaders() {
-    const token = localStorage.getItem('token');
+    const token = getAuthToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
 }
 

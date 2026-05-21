@@ -187,15 +187,15 @@ async function getPageAccessToken(pageId) {
     return envPageToken;
   }
 
-  // Check META_PAGE_ACCESS_TOKEN when pageId matches META_PAGE_ID
+  // NOTE: META_PAGE_ACCESS_TOKEN (static, page-scoped) is intentionally NOT used
+  // up-front. Static page tokens can expire (we observed one that expired
+  // 2026-05-13 still being preferred for the primary page, which broke
+  // /leadgen_forms with #190). We prefer a FRESH exchange below and fall back to
+  // the static token only if the exchange fails.
   const singlePageId = (process.env.META_PAGE_ID || '').trim();
   const singlePageToken = (process.env.META_PAGE_ACCESS_TOKEN || '').trim();
-  if (singlePageToken && singlePageId === pageId) {
-    pageTokenCache.tokens[pageId] = { token: singlePageToken, expiresAt: now + pageTokenCache.ttl };
-    return singlePageToken;
-  }
 
-  // Fetch from Meta API using System User Token
+  // Fetch a fresh Page Access Token from Meta API using the System User Token
   try {
     const systemToken = getSystemToken();
     const response = await axios.get(
@@ -229,6 +229,13 @@ async function getPageAccessToken(pageId) {
 
     // Clear cache on error
     delete pageTokenCache.tokens[pageId];
+
+    // Fallback 0: static META_PAGE_ACCESS_TOKEN for the configured primary page
+    // (used only now that a fresh exchange failed; may itself be expired).
+    if (singlePageToken && singlePageId === pageId) {
+      pageTokenCache.tokens[pageId] = { token: singlePageToken, expiresAt: now + pageTokenCache.ttl };
+      return singlePageToken;
+    }
 
     // Fallback 1: try GET pageId with META_ACCESS_TOKEN if different from system token (e.g. user token has page access)
     const systemToken = getSystemToken();
@@ -2619,10 +2626,57 @@ router.get("/instagram/online-followers", optionalAuthMiddleware, async (req, re
 //      3. DB fallback: read distinct form_ids from leads table for this page,
 //         then resolve each form name via /{formId}?fields=id,name
 // ---------------------------------------------------------------------
+// Tally synced lead counts per form_id (from the leads table) for a page.
+// Paginates in 1000-row chunks (PostgREST caps at 1000/req). Cached 2 min so
+// repeatedly opening the form dropdown doesn't re-scan a page's whole leads set.
+const _syncedCountCache = new Map(); // pageId -> { counts, expiresAt }
+async function getSyncedCountsByForm(pageId) {
+  const cached = _syncedCountCache.get(pageId);
+  if (cached && cached.expiresAt > Date.now()) return cached.counts;
+  const counts = {};
+  try {
+    const { supabase } = require('../supabase');
+    if (!supabase) return counts;
+    const PAGE = 1000;
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from('leads')
+        .select('form_id')
+        .eq('page_id', pageId)
+        .range(from, from + PAGE - 1);
+      if (error || !data || data.length === 0) break;
+      for (const r of data) if (r.form_id) counts[r.form_id] = (counts[r.form_id] || 0) + 1;
+      if (data.length < PAGE) break;
+    }
+    _syncedCountCache.set(pageId, { counts, expiresAt: Date.now() + 2 * 60 * 1000 });
+  } catch (_) { /* best-effort */ }
+  return counts;
+}
+
+// Attach leads_count (Meta), synced_count (DB) and a derived lead_status to each form:
+//   has_leads  ✅  synced into the DB (synced_count > 0)
+//   sync_issue ⚠️  Meta reports leads but none synced (leads_count > 0 && synced_count === 0)
+//   no_leads   ❌  no leads anywhere (leads_count === 0)
+async function enrichFormsWithLeadStatus(pageId, forms) {
+  if (!Array.isArray(forms) || forms.length === 0) return forms;
+  const synced = await getSyncedCountsByForm(pageId);
+  return forms.map((f) => {
+    const syncedCount = synced[f.id] || 0;
+    const metaCount = f.leads_count != null && f.leads_count !== '' ? Number(f.leads_count) : null;
+    const isActive = String(f.status || '').toUpperCase() === 'ACTIVE';
+    let lead_status;
+    if (metaCount != null && metaCount > 0 && syncedCount === 0) lead_status = 'sync_issue';
+    else if (syncedCount > 0) lead_status = 'has_leads';
+    else if (metaCount === 0) lead_status = 'no_leads';
+    else lead_status = syncedCount > 0 ? 'has_leads' : 'no_leads';
+    return { ...f, leads_count: metaCount, synced_count: syncedCount, active: isActive, lead_status };
+  });
+}
+
 router.get("/pages/:pageId/forms", optionalAuthMiddleware, async (req, res) => {
   const { pageId } = req.params;
   const formsUrl = `https://graph.facebook.com/${META_API_VERSION}/${pageId}/leadgen_forms`;
-  const formFields = "id,name,locale,status";
+  const formFields = "id,name,locale,status,leads_count";
 
   async function tryFetchPageForms(token) {
     const { data } = await axios.get(formsUrl, {
@@ -2651,7 +2705,8 @@ router.get("/pages/:pageId/forms", optionalAuthMiddleware, async (req, res) => {
       const forms = await tryFetchPageForms(token);
       if (forms.length > 0) {
         console.log(`[Forms] page=${pageId} ok via ${label}, count=${forms.length}`);
-        return res.json({ data: forms });
+        const enriched = await enrichFormsWithLeadStatus(pageId, forms);
+        return res.json({ data: enriched });
       }
       console.log(`[Forms] page=${pageId} ${label} returned 0 forms, trying next`);
     } catch (err) {
@@ -2702,7 +2757,8 @@ router.get("/pages/:pageId/forms", optionalAuthMiddleware, async (req, res) => {
     );
 
     console.log(`[Forms] page=${pageId} DB fallback resolved ${resolvedForms.length} form(s)`);
-    return res.json({ data: resolvedForms });
+    const enrichedFallback = await enrichFormsWithLeadStatus(pageId, resolvedForms);
+    return res.json({ data: enrichedFallback });
   } catch (dbFallbackErr) {
     console.error(`[Forms] page=${pageId} DB fallback failed:`, dbFallbackErr.message);
   }
@@ -4470,9 +4526,10 @@ router.get("/leads/db", optionalAuthMiddleware, async (req, res) => {
       
     }
     
-    // Enrich form names from Meta API for all leads (form_name is not stored in DB)
+    // Enrich form names from Meta API only for leads whose form_name is missing in DB.
+    // (form_name is stored at sync time; this is a fallback for legacy rows.)
     const formNameCache = {};
-    const leadsNeedingFormEnrichment = leads.filter(lead => lead.form_id);
+    const leadsNeedingFormEnrichment = leads.filter(lead => lead.form_id && (!lead.form_name || lead.form_name === 'N/A'));
     const uniqueFormIds = [...new Set(leadsNeedingFormEnrichment.map(lead => lead.form_id).filter(Boolean))];
     
     if (uniqueFormIds.length > 0) {
@@ -4518,9 +4575,9 @@ router.get("/leads/db", optionalAuthMiddleware, async (req, res) => {
         adName = adNameCache[lead.ad_id];
       }
       
-      // Get form name from API cache (form_name is not stored in DB)
-      let formName = 'N/A';
-      if (lead.form_id && formNameCache[lead.form_id]) {
+      // Prefer the form_name stored in the DB; fall back to API cache for legacy rows.
+      let formName = (lead.form_name && lead.form_name !== 'N/A') ? lead.form_name : 'N/A';
+      if (formName === 'N/A' && lead.form_id && formNameCache[lead.form_id]) {
         formName = formNameCache[lead.form_id];
       }
       
@@ -4694,9 +4751,9 @@ router.post("/leads/db", optionalAuthMiddleware, async (req, res) => {
       }
     }
 
-    // Enrich form names
+    // Enrich form names only for legacy rows missing form_name in the DB.
     const formNameCache  = {};
-    const uniqueFormIds  = [...new Set(leads.filter(l => l.form_id).map(l => l.form_id))];
+    const uniqueFormIds  = [...new Set(leads.filter(l => l.form_id && (!l.form_name || l.form_name === 'N/A')).map(l => l.form_id))];
     if (uniqueFormIds.length > 0) {
       const accessToken = getSystemToken();
       const batchSize = 10;
@@ -4720,10 +4777,14 @@ router.post("/leads/db", optionalAuthMiddleware, async (req, res) => {
       ad_id: lead.ad_id, campaign_id: lead.campaign_id, lead_id: lead.lead_id,
       form_id: lead.form_id, page_id: lead.page_id, created_time: lead.created_time,
       name: lead.name, phone: lead.phone, date: lead.date, time: lead.time,
-      Street: 'N/A', City: 'N/A', page_name: 'N/A',
+      Street: lead.street || lead.Street || 'N/A',
+      City: lead.city || lead.City || 'N/A',
+      page_name: 'N/A',
       campaign_name: lead.Campaign || 'N/A',
       ad_name: lead.ad_name || adNameCache[lead.ad_id] || 'N/A',
-      form_name: (lead.form_id && formNameCache[lead.form_id]) ? formNameCache[lead.form_id] : 'N/A'
+      form_name: (lead.form_name && lead.form_name !== 'N/A')
+        ? lead.form_name
+        : ((lead.form_id && formNameCache[lead.form_id]) ? formNameCache[lead.form_id] : 'N/A')
     }));
 
     res.json({
@@ -6298,5 +6359,12 @@ router.post("/cache/clear", optionalAuthMiddleware, (req, res) => {
   insightsCache.clear();
   res.json({ success: true, message: "Cache cleared" });
 });
+
+// Expose the robust Page Access Token resolver so other modules (e.g. the
+// scheduled leads sync) can reuse the same proven token strategy — including
+// the me/accounts and businesses/owned_pages fallbacks — instead of a weaker
+// raw-token approach that fails (#10 / #190) for non-primary pages.
+router.getPageAccessToken = getPageAccessToken;
+router.getPageAccessTokenSafe = getPageAccessTokenSafe;
 
 module.exports = router;

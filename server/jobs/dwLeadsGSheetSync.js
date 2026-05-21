@@ -29,7 +29,10 @@ const DW_PAGE_ID       = '113830624877941';
 const SPREADSHEET_ID   = '1RWOgyXVLZQvHJpSzRk1Vd02CipCL2KLEjrJNQT6pZMU';
 const SHEET_NAME       = 'DW LEADS FROM MKT SW';
 const META_API_VER     = 'v24.0';
-const SYNC_INTERVAL_MS       = 2 * 60 * 1000;   // 2 minutes
+// Push to the DW Google Sheet every 2 minutes (safety-net poll; the Meta webhook
+// still delivers each lead instantly). The 2-min floor keeps Meta API load well
+// below the old 1-min cadence that tripped rate limits. Override with DW_SHEET_SYNC_MS.
+const SYNC_INTERVAL_MS       = Math.max(2 * 60 * 1000, parseInt(process.env.DW_SHEET_SYNC_MS, 10) || 2 * 60 * 1000);
 const CAMPAIGN_CACHE_MS      = 6 * 60 * 60 * 1000;
 
 const STATE_FILE = path.resolve(__dirname, '../data/dwSheetSyncState.json');

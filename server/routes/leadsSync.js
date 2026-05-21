@@ -58,7 +58,10 @@ const SHEET_ID      = process.env.GOOGLE_SHEET_ID  || '1RWOgyXVLZQvHJpSzRk1Vd02C
 const SHEET_TAB     = process.env.GOOGLE_SHEET_TAB || 'DW-live data';
 const VERIFY_TOKEN  = process.env.META_WEBHOOK_VERIFY_TOKEN || 'mhs_dw_sync_2025';
 const META_VERSION  = process.env.META_API_VERSION || 'v21.0';
-const SYNC_INTERVAL = 60 * 1000; // 1 minute (safety-net poll; webhook delivers instantly)
+// Safety-net poll; the Meta webhook delivers leads instantly, so this can run
+// infrequently. Default 5 min (was 1 min, which — combined with the other two
+// pollers — kept tripping Meta's app rate limit). Override with LEADS_SHEET_SYNC_MS.
+const SYNC_INTERVAL = Math.max(60 * 1000, parseInt(process.env.LEADS_SHEET_SYNC_MS, 10) || 5 * 60 * 1000);
 
 const STATE_FILE = path.join(__dirname, '..', 'data', 'leads-sync-state.json');
 

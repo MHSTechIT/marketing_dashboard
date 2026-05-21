@@ -35,6 +35,73 @@ function getSystemToken() {
  *     often strip them.
  * Returns { discoveryToken, leadsToken } so each phase uses the right one.
  */
+/**
+ * Resolve a real Page Access Token using the SAME proven resolver the working
+ * /api/meta/pages/:pageId/forms endpoint uses (getPageAccessTokenSafe in
+ * meta.jsx). That resolver includes me/accounts and businesses/owned_pages
+ * fallbacks, so it succeeds for non-primary pages (Integfarms, etc.) where a
+ * raw system/user token is rejected (#10 "insufficient privileges" / #190
+ * "must be called with a Page Access Token").
+ *
+ * Lazy-required at call time to avoid a circular module load (meta.jsx requires
+ * this file at startup); by the time a sync runs, meta.jsx is fully loaded.
+ */
+// Cache freshly-resolved Page Access Tokens (45-min TTL) to avoid repeated Graph
+// exchanges across the per-page sync loop and to stay clear of rate limits.
+const _freshPageTokenCache = new Map(); // pageId -> { token, expiresAt }
+const _FRESH_TTL_MS = 45 * 60 * 1000;
+
+/**
+ * Directly exchange a FRESH Page Access Token via /{pageId}?fields=access_token.
+ * Works for owned pages (e.g. primary page Doctor Farmer). Used in preference to
+ * any static META_PAGE_ACCESS_TOKEN in .env, which can be expired (we observed a
+ * token that expired 2026-05-13 still being preferred for the primary page,
+ * causing #190 OAuthException during discovery).
+ */
+async function exchangeFreshPageToken(pageId, baseToken) {
+  if (!baseToken) return '';
+  try {
+    const r = await axios.get(
+      `https://graph.facebook.com/${META_API_VERSION}/${pageId}`,
+      { params: { fields: 'access_token', access_token: baseToken }, timeout: 30000 }
+    );
+    return r.data?.access_token || '';
+  } catch (e) {
+    return '';
+  }
+}
+
+/**
+ * Resolve a real Page Access Token. Strategy (most-reliable first):
+ *   1. Cached fresh token.
+ *   2. Fresh exchange via the system token (owned pages — fresh, never expired).
+ *   3. The proven getPageAccessTokenSafe resolver from meta.jsx (me/accounts +
+ *      businesses/owned_pages fallbacks) — needed for non-primary pages like
+ *      Integfarms where a direct exchange returns nothing.
+ * This avoids relying on a possibly-expired static META_PAGE_ACCESS_TOKEN.
+ */
+async function resolvePageAccessToken(pageId) {
+  const cached = _freshPageTokenCache.get(pageId);
+  if (cached && cached.expiresAt > Date.now()) return cached.token;
+
+  const systemToken = (process.env.META_SYSTEM_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN || '').trim();
+  let token = await exchangeFreshPageToken(pageId, systemToken);
+
+  if (!token) {
+    try {
+      const meta = require('../meta/meta.jsx');
+      if (meta && typeof meta.getPageAccessTokenSafe === 'function') {
+        ({ token } = await meta.getPageAccessTokenSafe(pageId));
+      }
+    } catch (e) {
+      console.warn(`[LeadsSync] getPageAccessTokenSafe unavailable for page ${pageId}: ${e.message}`);
+    }
+  }
+
+  if (token) _freshPageTokenCache.set(pageId, { token, expiresAt: Date.now() + _FRESH_TTL_MS });
+  return token || '';
+}
+
 async function getPageTokens(pageId) {
   const perPageEnv = (process.env[`META_PAGE_TOKEN_${pageId}`] || '').trim();
   const singlePageId = (process.env.META_PAGE_ID || '').trim();
@@ -42,24 +109,28 @@ async function getPageTokens(pageId) {
   const userToken = (process.env.META_ACCESS_TOKEN || '').trim();
   const systemToken = (process.env.META_SYSTEM_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN || '').trim();
 
-  // Discovery: prefer real page token > system token > exchange via Graph
-  let discoveryToken = perPageEnv ||
-    (singlePageToken && singlePageId === pageId ? singlePageToken : '') ||
-    systemToken;
+  // Discovery (/leadgen_forms) requires a real Page Access Token. Resolution order:
+  //   explicit per-page env token > freshly-resolved page token > static single-page
+  //   token (may be expired) > raw token.
+  // NOTE: the freshly-resolved token is preferred over the static
+  // META_PAGE_ACCESS_TOKEN because the latter can be expired.
+  let discoveryToken = perPageEnv;
 
-  if (!perPageEnv && !singlePageToken && !systemToken) {
-    try {
-      const r = await axios.get(
-        `https://graph.facebook.com/${META_API_VERSION}/${pageId}`,
-        { params: { fields: 'access_token', access_token: systemToken }, timeout: 30000 }
-      );
-      if (r.data?.access_token) discoveryToken = r.data.access_token;
-    } catch (e) {
-      console.warn(`[LeadsSync] Token exchange failed for page ${pageId}: ${e.response?.data?.error?.message || e.message}`);
-    }
+  if (!discoveryToken) {
+    discoveryToken = await resolvePageAccessToken(pageId);
   }
 
-  // Leads fetch: prefer user token (returns full attribution), fall back to discovery token
+  // Fallback to the static single-page token only if a fresh one couldn't be obtained.
+  if (!discoveryToken && singlePageToken && singlePageId === pageId) {
+    discoveryToken = singlePageToken;
+  }
+
+  // Last resort: raw token (works only for the primary/owned page, but keeps
+  // prior behaviour rather than failing outright).
+  if (!discoveryToken) discoveryToken = systemToken || userToken;
+
+  // Leads fetch: /{formId}/leads accepts user OR page tokens; the user token
+  // reliably returns ad_id/campaign_id attribution. Fall back to the page token.
   const leadsToken = userToken || discoveryToken;
 
   if (!discoveryToken && !leadsToken) {
@@ -510,7 +581,17 @@ async function fetchLeadsFromMeta(pageId, startDate, endDate) {
             }
           }
           if (street === 'N/A') {
-            street = fieldData.street || fieldData.street_address || fieldData.address || findFirstValueByKeyPattern(fieldData, /street|address/i) || 'N/A';
+            // These forms have no dedicated street field — they collect a post code
+            // that holds the address detail, so fall back to post_code/pin/zip.
+            // NOTE: findFirstValueByKeyPattern returns the string 'N/A' (truthy) when
+            // nothing matches, so we must unwrap it before the next `||` rather than
+            // letting it short-circuit the chain past the post_code fallbacks.
+            const unwrap = (v) => (v && v !== 'N/A') ? v : '';
+            street = fieldData.street || fieldData.street_address || fieldData.address
+              || unwrap(findFirstValueByKeyPattern(fieldData, /street|address/i))
+              || fieldData.post_code || fieldData.postcode
+              || unwrap(findFirstValueByKeyPattern(fieldData, /post_?code|postal|pin_?code|zip/i))
+              || 'N/A';
           }
           const city = fieldData.city || findFirstValueByKeyPattern(fieldData, /city|town/i) || 'N/A';
           const sugarPoll = fieldData['Sugar Poll'] || findFirstValueByKeyPattern(fieldData, /sugar/i) || 'N/A';
@@ -538,6 +619,7 @@ async function fetchLeadsFromMeta(pageId, startDate, endDate) {
           const mappedLead = {
             lead_id: lead.id,
             form_id: form.form_id,
+            form_name: form.name || null,
             page_id: form.page_id || pageId,
             campaign_id: campaignId,
             ad_id: adId,
