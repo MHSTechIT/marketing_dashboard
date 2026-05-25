@@ -70,8 +70,11 @@ app.use("/api/youtube", youtubeInsightsRoutes);
 // Leads → Google Sheets real-time sync (webhook + scheduler + backfill)
 const leadsSyncRoutes = require("./routes/leadsSync");
 app.use("/api/leads-sync", leadsSyncRoutes);
-// Start auto-sync: runs immediately on boot then every SYNC_INTERVAL
-leadsSyncRoutes.startScheduler();
+// Scheduler runs only on persistent hosts (Render/localhost).
+// On Vercel serverless each invocation is stateless so setInterval has no effect.
+if (!process.env.VERCEL) {
+  leadsSyncRoutes.startScheduler();
+}
 
 app.get("/", (req, res) => {
   res.send("Backend is running...");

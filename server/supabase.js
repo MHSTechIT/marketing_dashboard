@@ -1,64 +1,65 @@
 // server/supabase.js
-const { createClient } = require('@supabase/supabase-js');
+// MIGRATED: This module now points at a self-hosted PostgreSQL database via a
+// Supabase-compatible query builder (see pgClient.js). All existing code that
+// does `const { supabase } = require('../supabase')` and uses the chainable
+// `.from(table).select().eq()...` API keeps working unchanged — it just runs
+// against Postgres now instead of Supabase's hosted API.
+//
+// Connection is configured in server/.env:
+//   DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD  (+ optional DB_SSL=true)
+//
+// To temporarily revert to the hosted Supabase client, set USE_SUPABASE_HOSTED=true
+// in server/.env (requires SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY).
+
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
-const supabaseUrl = process.env.SUPABASE_URL;
-// Prefer service_role key for backend operations (bypasses RLS)
-// Fallback to anon key if service_role is not available
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+const useHosted = String(process.env.USE_SUPABASE_HOSTED || '').toLowerCase() === 'true';
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ Supabase credentials not found!');
-  console.error('   Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (recommended) or SUPABASE_ANON_KEY in server/.env');
-  console.error('   Get your keys from: Supabase Dashboard → Settings → API');
-}
+let supabase;
+let verifyTableExists;
 
-// Create Supabase client with proper configuration
-const supabase = supabaseUrl && supabaseKey 
-  ? createClient(supabaseUrl, supabaseKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      },
-      db: {
-        schema: 'public'
-      }
-    })
-  : null;
+if (useHosted) {
+  // ---- Legacy hosted Supabase client (opt-in fallback) ----
+  const { createClient } = require('@supabase/supabase-js');
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 
-// Helper function to verify table exists
-async function verifyTableExists(tableName = 'users') {
-  if (!supabase) {
-    return { exists: false, error: 'Supabase not configured' };
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('❌ USE_SUPABASE_HOSTED=true but SUPABASE_URL / key not set in server/.env');
   }
 
-  try {
-    // All tables now use lowercase column names
-    const { error } = await supabase
-      .from(tableName)
-      .select('id')
-      .limit(1);
+  supabase = supabaseUrl && supabaseKey
+    ? createClient(supabaseUrl, supabaseKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+        db: { schema: 'public' },
+      })
+    : null;
 
-    if (error) {
-      // Check for schema cache error
-      if (error.message?.includes('schema cache') || error.details?.includes('schema cache')) {
-        return { exists: true, error: 'Schema cache needs refresh', isCacheIssue: true };
+  verifyTableExists = async function (tableName = 'users') {
+    if (!supabase) return { exists: false, error: 'Supabase not configured' };
+    try {
+      const { error } = await supabase.from(tableName).select('id').limit(1);
+      if (error) {
+        if (error.message?.includes('schema cache')) return { exists: true, error: 'Schema cache needs refresh', isCacheIssue: true };
+        if (error.code === 'PGRST116') return { exists: false, error: `Table '${tableName}' does not exist` };
+        return { exists: false, error: error.message || 'Unknown error' };
       }
-      
-      // Table does not exist
-      if (error.code === 'PGRST116') {
-        return { exists: false, error: `Table '${tableName}' does not exist` };
-      }
-      
-      return { exists: false, error: error.message || 'Unknown error' };
+      return { exists: true };
+    } catch (err) {
+      return { exists: false, error: err.message };
     }
-    
-    return { exists: true };
-  } catch (err) {
-    return { exists: false, error: err.message };
+  };
+
+  console.log('[DB] Using HOSTED Supabase client (USE_SUPABASE_HOSTED=true)');
+} else {
+  // ---- Self-hosted Postgres via compatibility layer (default) ----
+  const pg = require('./pgClient');
+  supabase = pg.supabase;
+  verifyTableExists = pg.verifyTableExists;
+  if (supabase) {
+    console.log('[DB] Using self-hosted PostgreSQL (' + (process.env.DB_HOST || 'unconfigured') + ':' + (process.env.DB_PORT || '5432') + '/' + (process.env.DB_NAME || '') + ')');
   }
 }
 
 module.exports = { supabase, verifyTableExists };
-

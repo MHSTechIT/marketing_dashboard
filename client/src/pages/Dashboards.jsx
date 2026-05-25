@@ -185,7 +185,12 @@ const getAuthToken = () => {
   return null;
 };
 
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:4000';
+// In production (Vercel / any host) REACT_APP_API_BASE is intentionally left
+// empty so API calls use a relative path (/api/...) → same origin.
+// Vercel rewrites /api/* to the serverless function. No Render cold-start delay.
+// In local dev, fall back to the local Express server on :4000.
+const API_BASE = process.env.REACT_APP_API_BASE ||
+  (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000');
 
 // Fetch Google Sheets revenue metrics
 const fetchSheetsMetrics = async () => {
@@ -1214,7 +1219,8 @@ export default function AdsDashboardBootstrap() {
   }, [toast]);
 
   // Fetch latest saturation run for dashboard banner (saturated campaigns)
-  const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:4000';
+  const API_BASE = process.env.REACT_APP_API_BASE ||
+    (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000');
   useEffect(() => {
     let cancelled = false;
     const token = (() => {
