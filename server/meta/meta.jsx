@@ -2626,31 +2626,49 @@ router.get("/instagram/online-followers", optionalAuthMiddleware, async (req, re
 //      3. DB fallback: read distinct form_ids from leads table for this page,
 //         then resolve each form name via /{formId}?fields=id,name
 // ---------------------------------------------------------------------
-// Tally synced lead counts per form_id (from the leads table) for a page.
+// Single paginated scan of the leads table for a page, returning BOTH the
+// per-form synced lead counts AND the form name on record for each form_id.
 // Paginates in 1000-row chunks (PostgREST caps at 1000/req). Cached 2 min so
 // repeatedly opening the form dropdown doesn't re-scan a page's whole leads set.
-const _syncedCountCache = new Map(); // pageId -> { counts, expiresAt }
-async function getSyncedCountsByForm(pageId) {
+//
+// This is the dropdown's stable foundation: ids + names come straight from the
+// synced leads, so the form list keeps working even when EVERY Meta token is
+// expired or unauthorized for the page (which is the recurring failure mode —
+// see the /pages/:pageId/forms handler below).
+const _syncedCountCache = new Map(); // pageId -> { counts, names, expiresAt }
+async function getFormStatsByForm(pageId) {
   const cached = _syncedCountCache.get(pageId);
-  if (cached && cached.expiresAt > Date.now()) return cached.counts;
+  if (cached && cached.expiresAt > Date.now()) return cached;
   const counts = {};
+  const names = {};
   try {
     const { supabase } = require('../supabase');
-    if (!supabase) return counts;
+    if (!supabase) return { counts, names };
     const PAGE = 1000;
     for (let from = 0; ; from += PAGE) {
       const { data, error } = await supabase
         .from('leads')
-        .select('form_id')
+        .select('form_id, form_name')
         .eq('page_id', pageId)
         .range(from, from + PAGE - 1);
       if (error || !data || data.length === 0) break;
-      for (const r of data) if (r.form_id) counts[r.form_id] = (counts[r.form_id] || 0) + 1;
+      for (const r of data) {
+        if (!r.form_id) continue;
+        counts[r.form_id] = (counts[r.form_id] || 0) + 1;
+        if (r.form_name && !names[r.form_id]) names[r.form_id] = r.form_name;
+      }
       if (data.length < PAGE) break;
     }
-    _syncedCountCache.set(pageId, { counts, expiresAt: Date.now() + 2 * 60 * 1000 });
+    const entry = { counts, names, expiresAt: Date.now() + 2 * 60 * 1000 };
+    _syncedCountCache.set(pageId, entry);
+    return entry;
   } catch (_) { /* best-effort */ }
-  return counts;
+  return { counts, names };
+}
+
+// Back-compat wrapper: lead-status enrichment only needs the counts.
+async function getSyncedCountsByForm(pageId) {
+  return (await getFormStatsByForm(pageId)).counts;
 }
 
 // Attach leads_count (Meta), synced_count (DB) and a derived lead_status to each form:
@@ -2687,83 +2705,90 @@ router.get("/pages/:pageId/forms", optionalAuthMiddleware, async (req, res) => {
     return data.data || [];
   }
 
-  // ── Attempt 1 & 2: page token then system token ───────────────────────────
-  const tokensToTry = [];
-  try {
-    const pageToken = await getPageAccessToken(pageId);
-    if (pageToken) tokensToTry.push({ label: "page_token", token: pageToken });
-  } catch (_) {}
-  const userToken = (process.env.META_ACCESS_TOKEN || '').trim();
-  if (userToken) tokensToTry.push({ label: "user_token", token: userToken });
-  try {
-    const sysToken = getSystemToken();
-    if (sysToken) tokensToTry.push({ label: "system_token", token: sysToken });
-  } catch (_) {}
-
-  for (const { label, token } of tokensToTry) {
+  // ── Source 1 (best-effort): live forms from Meta ───────────────────────────
+  // Authoritative for name / status / leads_count, but DEPENDS on a working
+  // token. The recurring "No forms found" bug is here: META_SYSTEM_ACCESS_TOKEN
+  // is a single-page token (it can't mint tokens for other pages), so most pages
+  // rely on the personal user token, whose data-access window expires every
+  // ~90 days. When it lapses, every token below fails for those pages. We treat
+  // Meta as an enhancement layer and never let its failure empty the dropdown.
+  async function getMetaForms() {
+    const tokensToTry = [];
     try {
-      const forms = await tryFetchPageForms(token);
-      if (forms.length > 0) {
-        console.log(`[Forms] page=${pageId} ok via ${label}, count=${forms.length}`);
-        const enriched = await enrichFormsWithLeadStatus(pageId, forms);
-        return res.json({ data: enriched });
-      }
-      console.log(`[Forms] page=${pageId} ${label} returned 0 forms, trying next`);
-    } catch (err) {
-      const code = err.response?.data?.error?.code;
-      console.warn(`[Forms] page=${pageId} ${label} failed (code=${code}):`, err.response?.data?.error?.message || err.message);
-      if (code === 190 && label === "page_token") delete pageTokenCache.tokens[pageId];
-    }
-  }
+      const pageToken = await getPageAccessToken(pageId);
+      if (pageToken) tokensToTry.push({ label: "page_token", token: pageToken });
+    } catch (_) {}
+    const userToken = (process.env.META_ACCESS_TOKEN || '').trim();
+    if (userToken) tokensToTry.push({ label: "user_token", token: userToken });
+    try {
+      const sysToken = getSystemToken();
+      if (sysToken) tokensToTry.push({ label: "system_token", token: sysToken });
+    } catch (_) {}
 
-  // ── Attempt 3: DB fallback — discover form IDs from leads table ───────────
-  console.log(`[Forms] page=${pageId} — falling back to DB form discovery`);
-  try {
-    const { supabase } = require('../supabase');
-    if (!supabase) throw new Error('Supabase not available');
-
-    // Get all distinct form_ids for this page from the leads table
-    const { data: rows, error: dbErr } = await supabase
-      .from('leads')
-      .select('form_id')
-      .eq('page_id', pageId)
-      .not('form_id', 'is', null);
-
-    if (dbErr) throw dbErr;
-
-    const formIds = [...new Set((rows || []).map(r => r.form_id).filter(Boolean))];
-
-    if (formIds.length === 0) {
-      console.warn(`[Forms] page=${pageId} no form_ids in DB either — returning empty`);
-      return res.json({ data: [], warning: 'No forms found for this page. Check Meta Business Manager permissions.' });
-    }
-
-    // Resolve form names by calling /{formId}?fields=id,name for each
-    let sysToken;
-    try { sysToken = getSystemToken(); } catch (_) { sysToken = ''; }
-
-    const resolvedForms = await Promise.all(
-      formIds.map(async (fid) => {
-        try {
-          const { data: fd } = await axios.get(
-            `https://graph.facebook.com/${META_API_VERSION}/${fid}`,
-            { params: { access_token: sysToken, fields: 'id,name,status' }, timeout: 8000 }
-          );
-          return { id: fd.id || fid, name: fd.name || `Form ${fid}`, status: fd.status || 'ACTIVE' };
-        } catch (_) {
-          return { id: fid, name: `Form ${fid}`, status: 'ACTIVE' };
+    for (const { label, token } of tokensToTry) {
+      try {
+        const forms = await tryFetchPageForms(token);
+        if (forms.length > 0) {
+          console.log(`[Forms] page=${pageId} live ok via ${label}, count=${forms.length}`);
+          return forms;
         }
-      })
-    );
-
-    console.log(`[Forms] page=${pageId} DB fallback resolved ${resolvedForms.length} form(s)`);
-    const enrichedFallback = await enrichFormsWithLeadStatus(pageId, resolvedForms);
-    return res.json({ data: enrichedFallback });
-  } catch (dbFallbackErr) {
-    console.error(`[Forms] page=${pageId} DB fallback failed:`, dbFallbackErr.message);
+        console.log(`[Forms] page=${pageId} ${label} returned 0 forms, trying next`);
+      } catch (err) {
+        const code = err.response?.data?.error?.code;
+        console.warn(`[Forms] page=${pageId} ${label} failed (code=${code}):`, err.response?.data?.error?.message || err.message);
+        if (code === 190 && label === "page_token") delete pageTokenCache.tokens[pageId];
+      }
+    }
+    return [];
   }
 
-  res.json({ data: [], warning: `No valid access token for page ${pageId}. Add System User to this page in Meta Business Manager.` });
+  // ── Source 2 (always available): forms discovered from synced leads ────────
+  // Names + ids come from the leads table, so this works with zero Meta access.
+  // This is the guaranteed baseline that keeps the dropdown populated for any
+  // page that has ever synced a lead, no matter what the Meta tokens are doing.
+  async function getDbForms() {
+    const { counts, names } = await getFormStatsByForm(pageId);
+    return Object.keys(counts).map((id) => ({
+      id,
+      name: names[id] || `Form ${id}`,
+      status: 'ACTIVE',
+    }));
+  }
+
+  const [metaForms, dbForms] = await Promise.all([
+    getMetaForms().catch(() => []),
+    getDbForms().catch(() => []),
+  ]);
+
+  // Merge by form id. Start from the DB baseline, then overlay live Meta data
+  // (authoritative name/status/leads_count) without dropping DB-only forms that
+  // Meta omitted because the token couldn't see them.
+  const byId = new Map();
+  for (const f of dbForms) byId.set(String(f.id), { ...f, id: String(f.id) });
+  for (const f of metaForms) {
+    const id = String(f.id);
+    const prev = byId.get(id) || {};
+    byId.set(id, { ...prev, ...f, id, name: f.name || prev.name || `Form ${id}` });
+  }
+  const merged = [...byId.values()];
+
+  if (merged.length === 0) {
+    // Genuinely nothing — no Meta access AND no synced leads for this page.
+    console.warn(`[Forms] page=${pageId} no live forms and no synced leads — returning empty`);
+    return res.json({
+      data: [],
+      warning: 'No forms found for this page. Reconnect the page in Meta Business Manager (the System User needs a Page role with leads access), or wait for its first leads to sync.',
+    });
+  }
+
+  const enriched = await enrichFormsWithLeadStatus(pageId, merged);
+  // Most-synced forms first so the dropdown leads with the relevant ones.
+  enriched.sort((a, b) =>
+    (b.synced_count || 0) - (a.synced_count || 0) ||
+    String(a.name || '').localeCompare(String(b.name || ''))
+  );
+  console.log(`[Forms] page=${pageId} returning ${enriched.length} form(s) (meta=${metaForms.length}, db=${dbForms.length})`);
+  return res.json({ data: enriched });
 });
 
 // ---------------------------------------------------------------------

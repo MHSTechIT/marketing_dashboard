@@ -24,6 +24,7 @@ const router = express.Router();
 const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const { appendRows, readRange } = require('../services/googleSheetsService');
@@ -224,11 +225,62 @@ async function fetchFromMeta(formId, sinceTime = null) {
 
 let _syncRunning = false;
 
+const _sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+// ── Cross-process append lock ──────────────────────────────────────────────────
+// The in-memory mutex below only serializes writers WITHIN one Node process. If
+// more than one server instance of this codebase is running on the machine (e.g.
+// a stray `node server.js` left alongside `nodemon`), each has its own in-memory
+// mutex, so their pollers/webhooks can append the same fresh lead simultaneously
+// → duplicate rows. This file lock (in the OS temp dir, keyed by sheet+tab)
+// serializes the append critical section ACROSS processes too. In the normal
+// single-instance case it is acquired instantly and adds no observable behaviour.
+const SHEET_LOCK_FILE = path.join(
+  os.tmpdir(),
+  `mhs-leadssync-${SHEET_ID}-${SHEET_TAB}.lock`.replace(/[^a-zA-Z0-9._-]/g, '_')
+);
+const LOCK_STALE_MS = 60 * 1000;   // steal a lock whose holder looks dead
+const LOCK_WAIT_MS  = 45 * 1000;   // max time to wait for the lock before failing open
+
+async function withCrossProcessLock(fn) {
+  const start = Date.now();
+  let acquired = false;
+  while (Date.now() - start < LOCK_WAIT_MS) {
+    try {
+      // 'wx' = create exclusively; throws if the file already exists (atomic across processes)
+      const fd = fs.openSync(SHEET_LOCK_FILE, 'wx');
+      fs.writeSync(fd, JSON.stringify({ pid: process.pid, ts: Date.now() }));
+      fs.closeSync(fd);
+      acquired = true;
+      break;
+    } catch (e) {
+      // Lock is held — steal it if the holder is stale (crashed mid-write), else wait.
+      try {
+        const raw = JSON.parse(fs.readFileSync(SHEET_LOCK_FILE, 'utf8'));
+        if (Date.now() - (raw.ts || 0) > LOCK_STALE_MS) {
+          fs.unlinkSync(SHEET_LOCK_FILE);
+          continue;
+        }
+      } catch { /* unreadable/just-removed — retry */ }
+      await _sleep(200 + Math.floor(Math.random() * 150));
+    }
+  }
+  if (!acquired) {
+    // Fail open rather than risk dropping/delaying a lead. The in-memory mutex
+    // and the column-C recheck still guard within this process.
+    console.warn('[LeadsSync] Could not acquire cross-process sheet lock in time — proceeding with in-process lock only.');
+    return fn();
+  }
+  try { return await fn(); }
+  finally { try { fs.unlinkSync(SHEET_LOCK_FILE); } catch { /* already gone */ } }
+}
+
 // Single-writer mutex: webhook deliveries and poll appends share this lock so
 // that "read existingIds → check → appendRows" runs atomically. Without it, a
 // webhook can append a lead between the poll's pre-append recheck and its own
 // appendRows call (or two webhooks for the same leadgen_id can both pass dedup).
-// The lock is in-memory per Node process — fine for our single-server setup.
+// In-process serialization is wrapped in the cross-process lock so concurrent
+// server instances on the same machine cannot double-write either.
 let _writerLock = Promise.resolve();
 function withWriterLock(fn) {
   const prev = _writerLock;
@@ -236,7 +288,7 @@ function withWriterLock(fn) {
   const next = new Promise(r => { release = r; });
   _writerLock = prev.then(() => next);
   return prev.then(async () => {
-    try { return await fn(); }
+    try { return await withCrossProcessLock(fn); }
     finally { release(); }
   });
 }

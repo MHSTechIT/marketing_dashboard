@@ -1,5 +1,25 @@
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
+
+// ── Process-level crash guards ──────────────────────────────────────────────
+// The server runs several background schedulers (leads sync, insights sync,
+// token refresh, story snapshots, auto-delete, DW Google-Sheets sync). If any
+// of them throws an error that isn't caught — or a promise rejects without a
+// .catch — Node's default behaviour is to terminate the WHOLE process. Under
+// nodemon that means the API on :4000 goes down and does NOT come back until a
+// file is edited, so every dashboard section starts showing "Failed to fetch
+// leads from database" (it's really "backend unreachable").
+//
+// These guards log the failure and keep the process alive, so a single
+// background-job hiccup can never take the API offline. They do not change any
+// request/response behaviour — they only prevent silent process death.
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[FATAL-GUARD] Unhandled promise rejection (server kept alive):', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL-GUARD] Uncaught exception (server kept alive):', err && err.stack ? err.stack : err);
+});
+
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');

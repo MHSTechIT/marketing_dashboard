@@ -5743,112 +5743,6 @@ export default function AdsDashboardBootstrap() {
       </div>
 
 
-      {/* NEW: Leads by Ad Account — driven directly by the main Ad Account dropdown */}
-      <div className="row g-4 mb-4">
-        <div className="col-12">
-          <div className="chart-card">
-            <div className="chart-card-body">
-              <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                <strong className="chart-title">
-                  <span className="chart-emoji">🎯</span> Leads by Selected Ad Account
-                  {accountLeads.length > 0 && (
-                    <span className="badge bg-primary ms-2" style={{ fontSize: '0.85rem' }}>
-                      {accountLeads.length} leads
-                    </span>
-                  )}
-                </strong>
-                <div className="text-muted small">
-                  {selectedAdAccounts.length === 0
-                    ? 'Select an Ad Account above to view leads'
-                    : `Showing leads for ${selectedAdAccounts.length} selected ad account${selectedAdAccounts.length > 1 ? 's' : ''}`}
-                </div>
-              </div>
-
-              {accountLeadsLoading && (
-                <div className="text-center py-4">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Loading...</span>
-                  </div>
-                </div>
-              )}
-
-              {accountLeadsError && !accountLeadsLoading && (
-                <div className="alert alert-danger mb-3" style={{ fontSize: '0.875rem' }}>
-                  <i className="fas fa-exclamation-circle me-2"></i>
-                  {accountLeadsError.message}
-                </div>
-              )}
-
-              {!accountLeadsLoading && !accountLeadsError && selectedAdAccounts.length > 0 && accountLeads.length === 0 && (
-                <div className="alert alert-warning mb-3" style={{ fontSize: '0.875rem' }}>
-                  <i className="fas fa-info-circle me-2"></i>
-                  No leads found for the selected ad account(s) in this date range. If you expect leads here, click "Sync from Meta" in the section above to populate the database.
-                </div>
-              )}
-
-              {!accountLeadsLoading && accountLeads.length > 0 && (
-                <>
-                  <div className="table-responsive">
-                    <table className="table table-hover table-sm align-middle">
-                      <thead>
-                        <tr style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                          <th>Lead Name</th>
-                          <th>Phone Number</th>
-                          <th>Campaign Name</th>
-                          <th>Ad Name</th>
-                          <th>Form Name</th>
-                          <th>Created Time</th>
-                          <th>Ad Account</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {accountLeads
-                          .slice((accountLeadsPage - 1) * ACCOUNT_LEADS_PER_PAGE, accountLeadsPage * ACCOUNT_LEADS_PER_PAGE)
-                          .map((lead, idx) => (
-                            <tr key={lead.lead_id || lead.Id || idx}>
-                              <td>{lead.Name || lead.name || 'N/A'}</td>
-                              <td>{lead.Phone || lead.phone || 'N/A'}</td>
-                              <td>{lead.campaign_name || 'N/A'}</td>
-                              <td>{lead.ad_name || 'N/A'}</td>
-                              <td>{lead.form_name || 'N/A'}</td>
-                              <td>{lead.created_time || lead.TimeUtc || lead.Time || 'N/A'}</td>
-                              <td>{lead.account_name || 'N/A'}</td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {accountLeads.length > ACCOUNT_LEADS_PER_PAGE && (
-                    <div className="d-flex justify-content-between align-items-center mt-3">
-                      <div className="text-muted small">
-                        Page {accountLeadsPage} of {Math.ceil(accountLeads.length / ACCOUNT_LEADS_PER_PAGE)} ({accountLeads.length} total)
-                      </div>
-                      <div className="d-flex gap-2">
-                        <button
-                          className="btn btn-sm btn-outline-secondary"
-                          onClick={() => setAccountLeadsPage(p => Math.max(1, p - 1))}
-                          disabled={accountLeadsPage === 1}
-                        >
-                          Previous
-                        </button>
-                        <button
-                          className="btn btn-sm btn-outline-secondary"
-                          onClick={() => setAccountLeadsPage(p => Math.min(Math.ceil(accountLeads.length / ACCOUNT_LEADS_PER_PAGE), p + 1))}
-                          disabled={accountLeadsPage >= Math.ceil(accountLeads.length / ACCOUNT_LEADS_PER_PAGE)}
-                        >
-                          Next
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* New Filtered Leads Table Section */}
       <div className="row g-4 mb-4">
         <div className="col-12">
@@ -6045,6 +5939,15 @@ export default function AdsDashboardBootstrap() {
                             </div>
                           );
                         })}
+                        {/* No forms returned for this page — explain instead of showing an empty list */}
+                        {filteredLeadsForms.length === 0 && (
+                          <div style={{ padding: '12px', fontSize: '0.75rem', color: '#64748b', textAlign: 'center' }}>
+                            No forms found for this page.<br />
+                            <span style={{ color: '#94a3b8' }}>
+                              This page's Meta access may need reconnecting, or it has no synced leads yet.
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -6238,10 +6141,53 @@ export default function AdsDashboardBootstrap() {
                         ) : (
                           <tr>
                             <td colSpan="9" className="text-center py-5 text-muted">
-                              <div>
-                                <p className="mb-2">No leads data available.</p>
-                                <small>Please check your Meta API connection or filters.</small>
-                              </div>
+                              {(() => {
+                                // Phone search filtered everything out
+                                if (leadsPhoneSearch && filteredLeadsData.length > 0) {
+                                  return (
+                                    <div>
+                                      <p className="mb-2">No leads match the phone search.</p>
+                                      <small>Clear the phone filter to see all leads for this form.</small>
+                                    </div>
+                                  );
+                                }
+                                const selForm = filteredLeadsForms.find(f => f.id === filteredLeadsForm);
+                                const syncedTotal = selForm && selForm.synced_count != null ? Number(selForm.synced_count) : 0;
+                                const metaTotal = selForm && selForm.leads_count != null ? Number(selForm.leads_count) : 0;
+                                // Form selected and it HAS synced leads overall, but none fall in the
+                                // currently selected Time Range. The dropdown badge is an all-time count,
+                                // so this is the common "count shown but table empty" case.
+                                if (filteredLeadsForm && syncedTotal > 0) {
+                                  return (
+                                    <div>
+                                      <p className="mb-2">No leads in the selected time range.</p>
+                                      <small>
+                                        This form has {syncedTotal.toLocaleString()} synced lead{syncedTotal !== 1 ? 's' : ''} overall (the dropdown count is all-time) — widen the <strong>Time Range</strong> filter above to see them.
+                                      </small>
+                                    </div>
+                                  );
+                                }
+                                // Meta reports leads for this form but none have synced to the database.
+                                // This is the per-page case: the leads sync can't read this page's leads
+                                // (its Meta Page Access needs reconnecting), so the count shows but the
+                                // table is empty.
+                                if (filteredLeadsForm && metaTotal > 0 && syncedTotal === 0) {
+                                  return (
+                                    <div>
+                                      <p className="mb-2">This form's leads haven't synced to the dashboard yet.</p>
+                                      <small>
+                                        Meta reports {metaTotal.toLocaleString()} lead{metaTotal !== 1 ? 's' : ''} for this form, but none have synced to the database. This page's Meta access likely needs to be reconnected so the leads sync can read it.
+                                      </small>
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <div>
+                                    <p className="mb-2">No leads data available.</p>
+                                    <small>Please check your Meta API connection or filters.</small>
+                                  </div>
+                                );
+                              })()}
                             </td>
                           </tr>
                         )}
