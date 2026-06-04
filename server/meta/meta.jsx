@@ -4232,7 +4232,13 @@ router.get("/instagram/media-insights", optionalAuthMiddleware, async (req, res)
       return res.json(cached);
     }
 
-    const result = await fetchInstagramMediaInsights({
+    // Fail-fast guard: this endpoint fans out to one Meta call per media item, so a
+    // Meta rate-limit ((#4) Application request limit reached) or slowness can make it
+    // hang and cause the browser to see ERR_CONNECTION_RESET. Race the live fetch against
+    // a timeout; on timeout, serve the last-known (stale) cached value so the page still renders.
+    const MEDIA_INSIGHTS_TIMEOUT_MS = 25000;
+    let timedOut = false;
+    const fetchPromise = fetchInstagramMediaInsights({
       accountIds: cacheOpts.accountIds,
       pageIds: cacheOpts.pageIds,
       getPageToken: pageIds.length > 0 ? getPageAccessToken : undefined,
@@ -4240,12 +4246,64 @@ router.get("/instagram/media-insights", optionalAuthMiddleware, async (req, res)
       to: cacheOpts.to,
       period: cacheOpts.period,
       contentType: cacheOpts.contentType,
+    }).then((r) => {
+      // If it completes after we already timed out, populate the cache for next time.
+      if (timedOut && r != null) {
+        try { insightsCache.set(cacheKey, r, 5 * 60); } catch (_) {}
+      }
+      return r;
+    }).catch((e) => {
+      // Swallow late rejections (after timeout) so they don't become an
+      // unhandled rejection that crashes the process. Re-thrown only if still awaited.
+      if (timedOut) {
+        console.warn('[Instagram Media Insights] Late fetch error (after timeout):', e.message);
+        return Symbol.for('lateError');
+      }
+      throw e;
+    });
+    const timeoutPromise = new Promise((resolve) => {
+      setTimeout(() => { timedOut = true; resolve(Symbol.for('timeout')); }, MEDIA_INSIGHTS_TIMEOUT_MS);
     });
 
+    const raced = await Promise.race([fetchPromise, timeoutPromise]);
+    if (timedOut || raced === Symbol.for('timeout')) {
+      const stale = insightsCache.getStale(cacheKey);
+      if (stale != null) {
+        console.warn('[Instagram Media Insights] Live fetch slow/rate-limited — serving stale cache.');
+        return res.json({ ...stale, _stale: true });
+      }
+      console.warn('[Instagram Media Insights] Live fetch timed out and no cache available.');
+      return res.status(503).json({
+        error: 'Instagram insights temporarily unavailable',
+        details: 'Meta API is slow or rate-limited right now. Please retry shortly.',
+        isRateLimit: true,
+      });
+    }
+
+    const result = raced;
     insightsCache.set(cacheKey, result, 5 * 60); // 5 min TTL
     return res.json(result);
   } catch (err) {
     console.error("[Instagram Media Insights] Error:", err.response?.data || err.message);
+    // On Meta rate-limit / transient errors, serve stale cache if we have it.
+    const errCode = err.response?.data?.error?.code;
+    if (errCode === 4 || errCode === 17 || errCode === 32 || err.response?.data?.error?.is_transient) {
+      try {
+        const cacheKey = insightsCache.buildMediaInsightsKey({
+          accountIds: (req.query.accountIds ? String(req.query.accountIds).split(',').map(s=>s.trim()).filter(Boolean) : undefined),
+          pageIds: (req.query.pageIds ? String(req.query.pageIds).split(',').map(s=>s.trim()).filter(Boolean) : undefined),
+          from: req.query.from || undefined,
+          to: req.query.to || undefined,
+          period: req.query.period || undefined,
+          contentType: req.query.contentType ? String(req.query.contentType).toLowerCase() : undefined,
+        });
+        const stale = insightsCache.getStale(cacheKey);
+        if (stale != null) {
+          console.warn('[Instagram Media Insights] Rate-limited — serving stale cache.');
+          return res.json({ ...stale, _stale: true });
+        }
+      } catch (_) {}
+    }
     if (err.response?.data?.error?.code === 190) {
       return res.status(401).json({
         error: "Meta Access Token expired or invalid",
