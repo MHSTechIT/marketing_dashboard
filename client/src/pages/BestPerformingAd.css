@@ -711,6 +711,173 @@
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
+/* Automated (read-only) Conversion Count value */
+.conversion-count-value {
+    display: inline-block;
+    min-width: 48px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #0f766e;
+}
+
+/* Clickable conversion count button */
+.conversion-count-btn {
+    display: inline-block;
+    min-width: 48px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #0f766e;
+    background: none;
+    border: none;
+    padding: 2px 4px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    text-decoration: underline dotted;
+}
+.conversion-count-btn:hover:not(:disabled) {
+    background: rgba(15, 118, 110, 0.1);
+    color: #0d5e57;
+}
+.conversion-count-btn:disabled {
+    text-decoration: none;
+    cursor: default;
+    opacity: 0.7;
+}
+
+/* Drill-down modal overlay */
+.dd-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 1050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    animation: ddFadeIn 0.15s ease-out;
+}
+@keyframes ddFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.dd-modal {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    width: 100%;
+    max-width: 780px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    animation: ddSlideUp 0.18s ease-out;
+    overflow: hidden;
+}
+@keyframes ddSlideUp {
+    from { transform: translateY(16px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+}
+
+.dd-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    flex-shrink: 0;
+}
+.dd-modal-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+.dd-modal-sub {
+    font-size: 0.78rem;
+    color: #64748b;
+    margin-top: 2px;
+    max-width: 560px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dd-close-btn {
+    background: none;
+    border: none;
+    font-size: 1rem;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+    transition: background 0.15s, color 0.15s;
+}
+.dd-close-btn:hover {
+    background: #f1f5f9;
+    color: #334155;
+}
+
+.dd-state-center {
+    padding: 40px 24px;
+    text-align: center;
+    font-size: 0.9rem;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.dd-count-badge {
+    padding: 8px 24px 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #0f766e;
+    background: rgba(15, 118, 110, 0.07);
+    flex-shrink: 0;
+}
+
+.dd-table-wrap {
+    overflow-y: auto;
+    overflow-x: auto;
+    flex: 1;
+}
+
+.dd-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+}
+.dd-table thead th {
+    position: sticky;
+    top: 0;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 600;
+    color: #475569;
+    white-space: nowrap;
+}
+.dd-table tbody td {
+    padding: 9px 14px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+    white-space: nowrap;
+}
+.dd-table tbody tr:last-child td {
+    border-bottom: none;
+}
+.dd-table tbody tr:hover td {
+    background: #f8fafc;
+}
+.dd-mono {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.8rem;
+    color: #475569;
+}
+
 /* Table Heatmap Colors (Classes applied dynamically) */
 .cell-heatmap-high {
     background-color: rgba(16, 185, 129, 0.2);

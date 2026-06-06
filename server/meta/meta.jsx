@@ -712,6 +712,10 @@ router.get("/insights", optionalAuthMiddleware, async (req, res) => {
     res.json(payload);
   } catch (err) {
     console.error("Insights DB Error:", err?.message || err);
+    const isDbConnErr = /timeout|ETIMEDOUT|ECONNREFUSED|ECONNRESET|connection terminated|connection refused/i.test(err?.message || '');
+    if (isDbConnErr) {
+      return res.json({ data: [] });
+    }
     res.status(500).json({
       error: "Failed to fetch insights",
       details: err?.message || String(err),
@@ -1225,6 +1229,10 @@ router.get("/active-campaigns", optionalAuthMiddleware, async (req, res) => {
       });
     }
 
+    const isDbConnErr = /timeout|ETIMEDOUT|ECONNREFUSED|ECONNRESET|connection terminated|connection refused/i.test(err.message || '');
+    if (isDbConnErr) {
+      return res.json({ data: [] });
+    }
     res.status(500).json({
       error: "Failed to fetch campaign metrics",
       details: err.response?.data || err.message,
@@ -1397,6 +1405,10 @@ router.get("/ad-accounts", optionalAuthMiddleware, async (req, res) => {
         isAuthError: true,
         instruction: "Please update META_ACCESS_TOKEN in server/.env",
       });
+    }
+    const isDbConnErr = /timeout|ETIMEDOUT|ECONNREFUSED|ECONNRESET|connection terminated|connection refused/i.test(error.message || '');
+    if (isDbConnErr) {
+      return res.json([]);
     }
     res.status(500).json({
       error: "Failed to fetch ad accounts",
@@ -4714,6 +4726,10 @@ router.get("/leads/db", optionalAuthMiddleware, async (req, res) => {
     });
   } catch (err) {
     console.error("[Leads DB] Error:", err.message);
+    const isDbConnErr = /timeout|ETIMEDOUT|ECONNREFUSED|ECONNRESET|connection terminated|connection refused/i.test(err.message);
+    if (isDbConnErr) {
+      return res.json({ data: [], meta: { total: 0, dbUnavailable: true, filters: {} } });
+    }
     res.status(500).json({
       error: "Failed to fetch leads from database",
       details: err.message
@@ -4876,6 +4892,10 @@ router.post("/leads/db", optionalAuthMiddleware, async (req, res) => {
     });
   } catch (err) {
     console.error('[Leads DB POST] Error:', err.message);
+    const isDbConnErr = /timeout|ETIMEDOUT|ECONNREFUSED|ECONNRESET|connection terminated|connection refused/i.test(err.message);
+    if (isDbConnErr) {
+      return res.json({ data: [], meta: { total: 0, dbUnavailable: true, filters: {} } });
+    }
     res.status(500).json({ error: 'Failed to fetch leads from database', details: err.message });
   }
 });

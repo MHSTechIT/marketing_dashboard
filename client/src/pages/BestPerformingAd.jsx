@@ -181,7 +181,19 @@ const fetchInsightsData = async ({ campaignId = '', adId = '', startDate = '', e
         return data.map((d) => {
             const aggs = transformActions(d.actions || []);
             const values = transformActions(d.action_values || []);
-            const leadCount = aggs['lead'] || aggs['on_facebook_lead'] || aggs['onsite_conversion.lead_grouped'] || 0;
+            // Match Ads Analytics Dashboard's lead detection EXACTLY (Dashboards.jsx
+            // fetchDashboardData line ~474). Previously this only matched 3 keys,
+            // so any pixel-lead / generic *lead* action_type silently fell to 0 and
+            // the Best Ad "Total Leads" KPI under-counted vs the Dashboard for the
+            // same filters. Wildcard fallback sums every key whose name contains
+            // "lead" to catch new/uncommon Meta lead action_types.
+            const leadCount = aggs['lead']
+                || aggs['leads']
+                || aggs['on_facebook_lead']
+                || aggs['onsite_conversion.lead_grouped']
+                || aggs['offsite_conversion.fb_pixel_lead']
+                || (Object.keys(aggs || {}).filter((k) => String(k).toLowerCase().includes('lead')).reduce((s, k) => s + (Number(aggs[k]) || 0), 0))
+                || 0;
             const conversions = getConversionsFromAggs(aggs);
             
             const impressions = num(d.impressions);
@@ -248,17 +260,55 @@ const fetchWixAnalytics = async ({ from, to }) => {
     }
 };
 
-// Filter to only ACTIVE campaign and ad (same as Dashboard). Keep rows with null status (e.g. Wix).
-const filterByActiveStatus = (rows) => {
-    if (!Array.isArray(rows)) return [];
-    return rows.filter((r) => {
-        const campaignStatus = r.campaign_status || r.status;
-        const adStatus = r.ad_status || r.effective_status;
-        if (campaignStatus && campaignStatus !== 'ACTIVE') return false;
-        if (adStatus && adStatus !== 'ACTIVE') return false;
-        return true;
-    });
+// Fetch drill-down leads for a specific campaign (the paid leads that make up the conversion count).
+const fetchDrillDown = async ({ from, to, campaignId }) => {
+    try {
+        const token = getAuthToken();
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const url = `${API_BASE}/api/conversions/drill-down?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&campaign_id=${encodeURIComponent(campaignId)}`;
+        const res = await fetch(url, { headers });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) throw new Error(data.error || res.statusText);
+        return data;
+    } catch (e) {
+        throw new Error(e.message || 'Failed to load drill-down data');
+    }
 };
+
+// Fetch automated Conversion Counts (phone-match of ad leads vs the "Paid leads" sheet).
+// Returns { byCampaignId, byCampaignName } maps of campaign → matched-conversion count.
+const fetchConversionCounts = async ({ from, to }) => {
+    if (!from || !to) return { byCampaignId: {}, byCampaignName: {} };
+    try {
+        const token = getAuthToken();
+        const headers = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        const url = `${API_BASE}/api/conversions/by-campaign?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+        const res = await fetch(url, { headers });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+            console.warn('[BestPerformingAd] Conversion counts failed:', data.error || res.statusText);
+            return { byCampaignId: {}, byCampaignName: {} };
+        }
+        return {
+            byCampaignId: data.byCampaignId || {},
+            byCampaignName: data.byCampaignName || {}
+        };
+    } catch (e) {
+        console.warn('[BestPerformingAd] Conversion counts error:', e.message);
+        return { byCampaignId: {}, byCampaignName: {} };
+    }
+};
+
+// Include all campaigns and ads (ACTIVE, PAUSED, ARCHIVED, ENDED, etc.) to match
+// Meta Ads Manager and the Ads Analytics Dashboard's "Total Leads" KPI. Previously
+// this filtered to ACTIVE-only, which silently produced a smaller Total Leads
+// number than the Dashboard for the same Time Range / Project / Ad Account filters
+// (e.g. Dashboard 4,174 vs Best Ad 240 because most leads were attributed to ads
+// whose status had since flipped from ACTIVE to PAUSED/ENDED). Kept as an identity
+// function so the call site at line ~464 still works.
+const filterByActiveStatus = (rows) => Array.isArray(rows) ? rows : [];
 
 // Fetch insights from multiple ad accounts (one request per account) and combine. Same pattern as Dashboard fetchAllAccountsDashboardData.
 const fetchAllAccountsInsightsData = async ({ startDate, endDate, accounts, live = false }) => {
@@ -307,8 +357,14 @@ export default function BestPerformingAd() {
     const [insightsData, setInsightsData] = useState([]);
     const [dataLoading, setDataLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [manualConversionByCampaign, setManualConversionByCampaign] = useState({});
+    // Automated Conversion Count: matched-lead counts keyed by campaign_id (and a
+    // normalized-campaign-name fallback), computed server-side by phone-matching
+    // ad leads against the "Paid leads" sheet.
+    const [conversionsById, setConversionsById] = useState({});
+    const [conversionsByName, setConversionsByName] = useState({});
+    const [conversionsLoading, setConversionsLoading] = useState(false);
     const [selectedAdAccounts, setSelectedAdAccounts] = useState([]);
+    const [drillDown, setDrillDown] = useState({ open: false, loading: false, error: null, campaignId: '', campaignName: '', leads: [] });
 
     // Load ad accounts on mount
     useEffect(() => {
@@ -442,6 +498,38 @@ export default function BestPerformingAd() {
         loadInsights();
         return () => { cancelled = true; };
     }, [filters.startDate, filters.endDate, selectedProject, selectedProjectAdAccountIds, specifiedAdAccounts, accountsForFetch]);
+
+    // Fetch automated Conversion Counts whenever the date range changes. Counts are
+    // keyed by campaign_id, so they apply to whichever campaigns the table shows
+    // regardless of the project/account filter (joined client-side per row).
+    useEffect(() => {
+        let cancelled = false;
+        setConversionsLoading(true);
+        fetchConversionCounts({ from: filters.startDate, to: filters.endDate })
+            .then(({ byCampaignId, byCampaignName }) => {
+                if (cancelled) return;
+                setConversionsById(byCampaignId || {});
+                setConversionsByName(byCampaignName || {});
+            })
+            .finally(() => { if (!cancelled) setConversionsLoading(false); });
+        return () => { cancelled = true; };
+    }, [filters.startDate, filters.endDate]);
+
+    // Resolve the automated conversion count for a campaign row. Match STRICTLY by
+    // campaign_id. A Meta campaign_id is globally unique and belongs to exactly one
+    // ad account, so this single key validates BOTH "Campaign match" AND "Ad Account
+    // match" at once. We deliberately do NOT fall back to campaign name: the same
+    // name can exist under multiple campaign_ids / ad accounts (e.g. ABO campaigns
+    // duplicated across accounts), and a name fallback would sum conversions across
+    // them — mis-attributing one ad's conversions to another. A campaign with no
+    // matched leads correctly shows 0 rather than borrowing a same-named campaign's
+    // count.
+    const getConversionsForRow = (row) => {
+        if (!row) return 0;
+        const cid = row.campaign_id != null ? String(row.campaign_id) : '';
+        if (cid && conversionsById[cid] != null) return conversionsById[cid];
+        return 0;
+    };
 
     // Calculate totals from insights data
     const totals = useMemo(() => {
@@ -640,28 +728,25 @@ export default function BestPerformingAd() {
         return result;
     }, [insightsData, adAccounts, getAdAccountDisplay]);
 
-    // When user has entered any manual Conversion Count, sort table by ROAS (desc); otherwise keep sort by leads (desc)
-    const hasManualConversion = Object.keys(manualConversionByCampaign).length > 0;
+    // Sort table by ROAS (desc), where ROAS is driven by the automated Conversion
+    // Count (matched paid leads). Falls back to lead-count sort only when no
+    // conversions are present at all.
+    const hasConversions = Object.keys(conversionsById).length > 0 || Object.keys(conversionsByName).length > 0;
     const campaignDataForTable = useMemo(() => {
-        if (!hasManualConversion) return campaignData;
+        if (!hasConversions) return campaignData;
         return [...campaignData].sort((a, b) => {
-            const convA = manualConversionByCampaign[a.id] !== undefined ? manualConversionByCampaign[a.id] : a.conversions;
-            const convB = manualConversionByCampaign[b.id] !== undefined ? manualConversionByCampaign[b.id] : b.conversions;
+            const convA = getConversionsForRow(a);
+            const convB = getConversionsForRow(b);
             const roasA = a.spend > 0 ? (Number(convA) || 0) * REVENUE_PER_CONVERSION / a.spend : 0;
             const roasB = b.spend > 0 ? (Number(convB) || 0) * REVENUE_PER_CONVERSION / b.spend : 0;
             return roasB - roasA;
         });
-    }, [campaignData, manualConversionByCampaign]);
+    }, [campaignData, conversionsById, conversionsByName, hasConversions]);
 
-    // Total conversion count for KPI: sum of manual overrides (when set) or API conversions per campaign
+    // Total conversion count for KPI: sum of automated matched conversions per campaign
     const totalConversionCount = useMemo(() => {
-        return campaignData.reduce((sum, row) => {
-            const effective = manualConversionByCampaign[row.id] !== undefined
-                ? manualConversionByCampaign[row.id]
-                : row.conversions;
-            return sum + (Number(effective) || 0);
-        }, 0);
-    }, [campaignData, manualConversionByCampaign]);
+        return campaignData.reduce((sum, row) => sum + (Number(getConversionsForRow(row)) || 0), 0);
+    }, [campaignData, conversionsById, conversionsByName]);
 
     // Date range filter handler (same as Ads Analytics Dashboard)
     const handleDateRangeApply = (payload) => {
@@ -1132,9 +1217,7 @@ export default function BestPerformingAd() {
                             </tr>
                         ) : (
                             campaignDataForTable.map((row) => {
-                                const effectiveConversions = manualConversionByCampaign[row.id] !== undefined
-                                    ? manualConversionByCampaign[row.id]
-                                    : row.conversions;
+                                const effectiveConversions = getConversionsForRow(row);
                                 const effectiveConversionRate = row.leads > 0
                                     ? (effectiveConversions / row.leads) * 100
                                     : 0;
@@ -1151,29 +1234,20 @@ export default function BestPerformingAd() {
                                         {formatNum(row.leads)}
                                     </td>
                                     <td className={getBgClass(effectiveConversions, 'conversionCount')}>
-                                        <input
-                                            type="number"
-                                            min={0}
-                                            step={1}
-                                            className="conversion-count-input"
-                                            value={manualConversionByCampaign[row.id] !== undefined ? manualConversionByCampaign[row.id] : row.conversions}
-                                            onChange={(e) => {
-                                                const v = e.target.value;
-                                                if (v === '') {
-                                                    setManualConversionByCampaign((prev) => {
-                                                        const next = { ...prev };
-                                                        delete next[row.id];
-                                                        return next;
-                                                    });
-                                                } else {
-                                                    const n = parseInt(v, 10);
-                                                    if (!Number.isNaN(n) && n >= 0) {
-                                                        setManualConversionByCampaign((prev) => ({ ...prev, [row.id]: n }));
-                                                    }
-                                                }
+                                        <button
+                                            className="conversion-count-btn"
+                                            title="Click to see matched paid leads"
+                                            disabled={conversionsLoading || effectiveConversions === 0}
+                                            onClick={() => {
+                                                if (!row.campaign_id) return;
+                                                setDrillDown({ open: true, loading: true, error: null, campaignId: row.campaign_id, campaignName: row.name, leads: [] });
+                                                fetchDrillDown({ from: filters.startDate, to: filters.endDate, campaignId: row.campaign_id })
+                                                    .then((d) => setDrillDown((prev) => ({ ...prev, loading: false, leads: d.leads || [] })))
+                                                    .catch((e) => setDrillDown((prev) => ({ ...prev, loading: false, error: e.message })));
                                             }}
-                                            aria-label={`Conversion count for ${row.name}`}
-                                        />
+                                        >
+                                            {conversionsLoading ? '…' : formatNum(effectiveConversions)}
+                                        </button>
                                     </td>
                                     <td className={getBgClass(effectiveConversionRate, 'conversionRate')}>
                                         {formatPerc(effectiveConversionRate)}
@@ -1202,6 +1276,67 @@ export default function BestPerformingAd() {
                     ) : null}
                 </div>
             </div>
+
+            {/* Conversion Count Drill-Down Modal */}
+            {drillDown.open && (
+                <div className="dd-overlay" onClick={() => setDrillDown((p) => ({ ...p, open: false }))}>
+                    <div className="dd-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="dd-modal-header">
+                            <div>
+                                <div className="dd-modal-title">Conversion Count — Matched Paid Leads</div>
+                                <div className="dd-modal-sub">{drillDown.campaignName}</div>
+                            </div>
+                            <button className="dd-close-btn" onClick={() => setDrillDown((p) => ({ ...p, open: false }))} aria-label="Close">✕</button>
+                        </div>
+
+                        {drillDown.loading && (
+                            <div className="dd-state-center">
+                                <div className="spinner-border spinner-border-sm text-primary me-2" role="status" />
+                                Loading matched leads…
+                            </div>
+                        )}
+                        {!drillDown.loading && drillDown.error && (
+                            <div className="dd-state-center text-danger">{drillDown.error}</div>
+                        )}
+                        {!drillDown.loading && !drillDown.error && drillDown.leads.length === 0 && (
+                            <div className="dd-state-center text-muted">No matched paid leads found for this campaign in the selected date range.</div>
+                        )}
+                        {!drillDown.loading && !drillDown.error && drillDown.leads.length > 0 && (
+                            <>
+                                <div className="dd-count-badge">{drillDown.leads.length} matched lead{drillDown.leads.length !== 1 ? 's' : ''}</div>
+                                <div className="dd-table-wrap">
+                                    <table className="dd-table">
+                                        <thead>
+                                            <tr>
+                                                <th>S.No</th>
+                                                <th>Access Batch</th>
+                                                <th>Paid Date</th>
+                                                <th>Paid Name</th>
+                                                <th>Phone Number</th>
+                                                <th>Alternate Number</th>
+                                                <th>Conversion Mode</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {drillDown.leads.map((lead, idx) => (
+                                                <tr key={lead.leadId || idx}>
+                                                    <td>{idx + 1}</td>
+                                                    <td>{lead.accessBatch || '—'}</td>
+                                                    <td>{lead.paidDate || '—'}</td>
+                                                    <td>{lead.paidName || '—'}</td>
+                                                    <td className="dd-mono">{lead.paidPhone || lead.leadPhone || '—'}</td>
+                                                    <td className="dd-mono">{lead.alternateNumber || '—'}</td>
+                                                    <td>{lead.conversionMode || '—'}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* Date Range Filter Modal (same as Ads Analytics Dashboard) */}
             <DateRangeFilter

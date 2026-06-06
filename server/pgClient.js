@@ -34,7 +34,7 @@ if (DB_HOST && DB_NAME && DB_USER) {
     password: DB_PASSWORD,
     max: parseInt(process.env.DB_POOL_MAX || '10', 10),
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 15000,
+    connectionTimeoutMillis: 5000,
     // Most self-hosted Postgres on a raw IP has no TLS. Enable via DB_SSL=true if needed.
     ssl: String(process.env.DB_SSL || '').toLowerCase() === 'true'
       ? { rejectUnauthorized: false }

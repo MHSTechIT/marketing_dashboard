@@ -11,6 +11,10 @@ const { optionalAuthMiddleware } = require("../auth");
 
 const router = express.Router();
 
+function isDbConnErr(msg) {
+  return /timeout|ETIMEDOUT|ECONNREFUSED|ECONNRESET|connection terminated|connection refused/i.test(msg || '');
+}
+
 const PORT = process.env.PORT || 4000;
 const BASE_URL = process.env.API_BASE_URL || process.env.PLAN_AGGREGATES_BASE_URL || `http://localhost:${PORT}`;
 
@@ -39,11 +43,13 @@ router.get("/teams", optionalAuthMiddleware, async (req, res) => {
       .order("id", { ascending: true });
     if (error) {
       console.error("[Plan teams GET]", error);
+      if (isDbConnErr(error.message)) return res.json({ data: [] });
       return res.status(500).json({ error: error.message });
     }
     res.json({ data: data || [] });
   } catch (err) {
     console.error("[Plan teams GET]", err);
+    if (isDbConnErr(err.message)) return res.json({ data: [] });
     res.status(500).json({ error: err.message });
   }
 });
@@ -142,11 +148,13 @@ router.get("/targets", optionalAuthMiddleware, async (req, res) => {
       .eq("week_start", weekStart);
     if (targetsError) {
       console.error("[Plan targets GET]", targetsError);
+      if (isDbConnErr(targetsError.message)) return res.json({ data: [] });
       return res.status(500).json({ error: targetsError.message });
     }
     res.json({ data: targets || [] });
   } catch (err) {
     console.error("[Plan targets GET]", err);
+    if (isDbConnErr(err.message)) return res.json({ data: [] });
     res.status(500).json({ error: err.message });
   }
 });
@@ -288,6 +296,9 @@ router.get("/aggregates", optionalAuthMiddleware, async (req, res) => {
       .order("id", { ascending: true });
     if (teamsError) {
       console.error("[Plan aggregates] teams", teamsError);
+      if (isDbConnErr(teamsError.message)) {
+        return res.json({ data: [], budgetForecast: { weekly_ad_spend_target: 0, actual_ad_spend: 0, remaining_budget: 0, forecast_ad_spend: 0 } });
+      }
       return res.status(500).json({ error: teamsError.message });
     }
     if (!teams || teams.length === 0) {
@@ -308,6 +319,9 @@ router.get("/aggregates", optionalAuthMiddleware, async (req, res) => {
       .eq("week_start", weekStart);
     if (targetsError) {
       console.error("[Plan aggregates] targets", targetsError);
+      if (isDbConnErr(targetsError.message)) {
+        return res.json({ data: [], budgetForecast: { weekly_ad_spend_target: 0, actual_ad_spend: 0, remaining_budget: 0, forecast_ad_spend: 0 } });
+      }
       return res.status(500).json({ error: targetsError.message });
     }
     const targetsByTeam = {};
@@ -436,6 +450,9 @@ router.get("/aggregates", optionalAuthMiddleware, async (req, res) => {
     });
   } catch (err) {
     console.error("[Plan aggregates]", err);
+    if (isDbConnErr(err.message)) {
+      return res.json({ data: [], budgetForecast: { weekly_ad_spend_target: 0, actual_ad_spend: 0, remaining_budget: 0, forecast_ad_spend: 0 } });
+    }
     res.status(500).json({ error: err.message });
   }
 });

@@ -1,0 +1,14 @@
+[
+  {
+    "id": 1,
+    "email": "yuvaraja@gmail.com",
+    "password_hash": "$2b$10$5Er0QAZLy4IvWfT1aoimjuwxfcSTj9CbjVK3zfQ4lOGxhgD.V0ore",
+    "full_name": "Yuvaraja"
+  },
+  {
+    "id": 2,
+    "email": "info@myhealthschool.in",
+    "password_hash": "$2b$10$5Er0QAZLy4IvWfT1aoimjuwxfcSTj9CbjVK3zfQ4lOGxhgD.V0ore",
+    "full_name": "MHS Admin"
+  }
+]

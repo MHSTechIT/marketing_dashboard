@@ -67,6 +67,10 @@ app.use("/api/unique-leads", uniqueLeadsRoutes);
 const youtubeInsightsRoutes = require("./routes/youtubeInsights");
 app.use("/api/youtube", youtubeInsightsRoutes);
 
+// Conversion Count — phone-match ad leads against the "Paid leads" sheet
+const conversionsRoutes = require("./routes/conversions");
+app.use("/api/conversions", conversionsRoutes);
+
 // Leads → Google Sheets real-time sync (webhook + scheduler + backfill)
 const leadsSyncRoutes = require("./routes/leadsSync");
 app.use("/api/leads-sync", leadsSyncRoutes);
@@ -275,14 +279,35 @@ app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'email and password required' });
 
+  const fs = require('fs');
+  const DEV_USERS_FILE = path.join(__dirname, 'data', 'dev-users.json');
+
+  async function tryDevFallback() {
+    if (!fs.existsSync(DEV_USERS_FILE)) return null;
+    try {
+      const devUsers = JSON.parse(fs.readFileSync(DEV_USERS_FILE, 'utf8'));
+      const devUser = devUsers.find(u => u.email === email);
+      if (!devUser) return null;
+      const ok = await comparePassword(password, devUser.password_hash);
+      if (!ok) return false;
+      return devUser;
+    } catch { return null; }
+  }
+
   try {
     if (!supabase) {
-      return res.status(500).json({ 
-        error: 'Supabase not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in server/.env' 
+      const devUser = await tryDevFallback();
+      if (devUser === false) return res.status(401).json({ error: 'Invalid credentials' });
+      if (devUser) {
+        const token = signToken({ id: devUser.id, email: devUser.email });
+        return res.json({ token, user: { id: devUser.id, email: devUser.email, fullName: devUser.full_name } });
+      }
+      return res.status(500).json({
+        error: 'Supabase not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in server/.env'
       });
     }
 
-    // Get user from Supabase (using lowercase table and column names)
+    // Get user from database
     const { data: user, error: fetchError } = await supabase
       .from('users')
       .select('id, email, password_hash, full_name')
@@ -292,10 +317,17 @@ app.post('/api/auth/login', async (req, res) => {
     if (fetchError) {
       console.error('Login error:', fetchError);
       if (fetchError.code === 'PGRST116') {
-        return res.status(500).json({ 
+        return res.status(500).json({
           error: 'Table not found. Please create the users table in Supabase.',
           details: 'Run the SQL from server/supabase-complete-schema.sql in your Supabase SQL Editor'
         });
+      }
+      // DB unreachable — try local dev fallback
+      const devUser = await tryDevFallback();
+      if (devUser === false) return res.status(401).json({ error: 'Invalid credentials' });
+      if (devUser) {
+        const token = signToken({ id: devUser.id, email: devUser.email });
+        return res.json({ token, user: { id: devUser.id, email: devUser.email, fullName: devUser.full_name } });
       }
       return res.status(500).json({ error: 'Database error: ' + fetchError.message });
     }
@@ -311,24 +343,44 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const token = signToken({ id: user.id, email: user.email });
-    res.json({ 
-      token, 
-      user: { 
-        id: user.id, 
-        email: user.email, 
-        fullName: user.full_name 
-      } 
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.full_name
+      }
     });
   } catch (err) {
     console.error('Login error:', err);
+    // DB timeout — try local dev fallback before returning error
+    const devUser = await tryDevFallback().catch(() => null);
+    if (devUser === false) return res.status(401).json({ error: 'Invalid credentials' });
+    if (devUser) {
+      const token = signToken({ id: devUser.id, email: devUser.email });
+      return res.json({ token, user: { id: devUser.id, email: devUser.email, fullName: devUser.full_name } });
+    }
     res.status(500).json({ error: 'Server error: ' + err.message });
   }
 });
 
 // --- Protected example: get current user
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
+  const fs = require('fs');
+  const DEV_USERS_FILE = path.join(__dirname, 'data', 'dev-users.json');
+
+  function devUserById(id) {
+    if (!fs.existsSync(DEV_USERS_FILE)) return null;
+    try {
+      const devUsers = JSON.parse(fs.readFileSync(DEV_USERS_FILE, 'utf8'));
+      return devUsers.find(u => u.id === id) || null;
+    } catch { return null; }
+  }
+
   try {
     if (!supabase) {
+      const devUser = devUserById(req.user.id);
+      if (devUser) return res.json({ id: devUser.id, email: devUser.email, FullName: devUser.full_name, fullName: devUser.full_name, role: devUser.role || 'admin' });
       return res.status(500).json({ error: 'Supabase not configured' });
     }
 
@@ -339,18 +391,22 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
       .single();
 
     if (error || !user) {
+      const devUser = devUserById(req.user.id);
+      if (devUser) return res.json({ id: devUser.id, email: devUser.email, FullName: devUser.full_name, fullName: devUser.full_name, role: devUser.role || 'admin' });
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json({ 
-      id: user.id, 
-      email: user.email, 
+    res.json({
+      id: user.id,
+      email: user.email,
       FullName: user.full_name,
       fullName: user.full_name,
       role: user.role || 'user'
     });
   } catch (e) {
     console.error('Get user error:', e);
+    const devUser = devUserById(req.user.id);
+    if (devUser) return res.json({ id: devUser.id, email: devUser.email, FullName: devUser.full_name, fullName: devUser.full_name, role: devUser.role || 'admin' });
     res.status(500).json({ error: 'Server error: ' + e.message });
   }
 });

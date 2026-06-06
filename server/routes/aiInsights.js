@@ -8,7 +8,11 @@ const axios   = require('axios');
 const crypto  = require('crypto');
 
 const router = express.Router();
-const GEMINI_MODEL = 'gemini-2.0-flash-lite';
+// Model is env-overridable via GEMINI_MODEL. NOTE: the gemini-2.0-flash-lite and
+// gemini-2.0-flash FREE tiers return "limit: 0" (HTTP 429 quota exceeded) on the
+// current API key, and gemini-1.5-flash is retired (404). gemini-2.5-flash has
+// working free-tier quota, so it is the default.
+const GEMINI_MODEL = (process.env.GEMINI_MODEL || 'gemini-2.5-flash').trim();
 
 /** Call Google Gemini REST API via axios (no SDK needed). */
 async function callGemini(prompt, { system = '', temperature = 0.6, maxTokens = 8192 } = {}) {
