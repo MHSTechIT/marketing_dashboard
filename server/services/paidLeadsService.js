@@ -18,10 +18,12 @@
  *   PAID_LEADS_CACHE_MS   (default: 10 min)
  */
 
-const { readRange } = require('./googleSheetsService');
+const { readRange, getSheetsClient } = require('./googleSheetsService');
 
 const PAID_SHEET_ID  = (process.env.PAID_LEADS_SHEET_ID  || '17pctKsTlWq93poCMVwnMzL7cPYuIfGN7coFieop2xdM').trim();
-const PAID_SHEET_TAB = (process.env.PAID_LEADS_SHEET_TAB || 'Paid leads- L1').trim();
+// Preferred tab name. The actual tab can differ if it's renamed in the sheet
+// (e.g. "Paid leads- L1" → "Paid leads"), so resolvePaidTab() below tolerates that.
+const PAID_SHEET_TAB = (process.env.PAID_LEADS_SHEET_TAB || 'Paid leads').trim();
 const CACHE_MS       = Math.max(60 * 1000, parseInt(process.env.PAID_LEADS_CACHE_MS, 10) || 10 * 60 * 1000);
 
 /**
@@ -53,6 +55,29 @@ function parsePaidDateMs(raw) {
 let _cache = null; // { set: Set<string>, rowsByPhone: Map, loadedAt: number, rowsRead: number }
 let _inflight = null;
 
+/**
+ * Resolve the actual paid-leads tab title, tolerant of renames. Order of preference:
+ *   1. the configured PAID_SHEET_TAB if it exists,
+ *   2. else a tab whose title contains "paid" (case-insensitive),
+ *   3. else the first tab in the spreadsheet.
+ * Falls back to the configured name if the metadata lookup fails. This means a
+ * harmless tab rename in the sheet (e.g. "Paid leads- L1" → "Paid leads") no longer
+ * breaks the Conversion Count.
+ */
+async function resolvePaidTab() {
+  try {
+    const sheets = await getSheetsClient();
+    const meta = await sheets.spreadsheets.get({ spreadsheetId: PAID_SHEET_ID });
+    const titles = (meta.data.sheets || []).map((s) => s.properties && s.properties.title).filter(Boolean);
+    if (titles.length === 0) return PAID_SHEET_TAB;
+    if (titles.includes(PAID_SHEET_TAB)) return PAID_SHEET_TAB;
+    const paidMatch = titles.find((t) => /paid/i.test(t));
+    return paidMatch || titles[0];
+  } catch (e) {
+    return PAID_SHEET_TAB;
+  }
+}
+
 async function loadPaidSet() {
   // Read full rows A:G in one call. The "Paid leads" sheet columns are:
   //   A = S.No
@@ -62,7 +87,8 @@ async function loadPaidSet() {
   //   E = Phone Number
   //   F = Alternate Number
   //   G = Conversion Mode (Online / Offline)
-  const rows = await readRange(PAID_SHEET_ID, `${PAID_SHEET_TAB}!A2:G`);
+  const tab = await resolvePaidTab();
+  const rows = await readRange(PAID_SHEET_ID, `${tab}!A2:G`);
 
   const set = new Set();
   // Maps normalizedPhone → Array<{ sNo, accessBatch, paidDate, paidName, phone,
