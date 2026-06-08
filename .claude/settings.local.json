@@ -2,7 +2,15 @@
   "permissions": {
     "allow": [
       "Bash(taskkill /F /IM node.exe)",
-      "Bash(exit 0)"
+      "Bash(exit 0)",
+      "PowerShell($c = Get-NetTCPConnection -LocalPort 4000 -State Listen -ErrorAction SilentlyContinue; foreach \\($x in $c\\) { Stop-Process -Id $x.OwningProcess -Force -ErrorAction SilentlyContinue }; Start-Sleep -Seconds 2; \"4000 cleared\")",
+      "Bash(node server.js)",
+      "Bash(curl -s \"http://localhost:4000/api/health\" -o /dev/null -w \"%{http_code}\" --max-time 5)",
+      "Bash(node -e \"let s='';process.stdin.on\\('data',d=>s+=d\\).on\\('end',\\(\\)=>{try{const j=JSON.parse\\(s\\);const ids=Object.keys\\(j.byCampaignId||{}\\);const sum=Object.values\\(j.byCampaignId||{}\\).reduce\\(\\(a,b\\)=>a+b,0\\);console.log\\('ok:',j.ok,'| scanned:',j.scanned,'| totalMatched\\(unique phones\\):',j.totalMatched,'| campaigns:',ids.length,'| sum\\(byCampaignId\\):',sum\\);}catch\\(e\\){console.log\\('raw:',s.slice\\(0,200\\)\\);}}\\)\")",
+      "Bash(ls .github/)",
+      "Bash(ls *.sh)",
+      "Bash(git push *)",
+      "Read(//c/Users/DELL/**)"
     ]
   }
 }

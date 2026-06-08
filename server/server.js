@@ -1278,7 +1278,16 @@ let dwLeadsGSheetSyncIntervalId = null;
 
 const PORT = process.env.PORT || 4000;
 
+let _schedulersStarted = false;
 function startSchedulers() {
+  // Idempotent: never start the background intervals twice in one process
+  // (would double-poll Meta and double-push leads).
+  if (_schedulersStarted) {
+    console.log('[Schedulers] Already started in this process — skipping.');
+    return;
+  }
+  _schedulersStarted = true;
+  console.log('[Schedulers] Starting background lead-sync schedulers…');
   try { leadsSyncIntervalId = startLeadsSyncScheduler(); } catch (e) { console.error('Error starting leads sync scheduler:', e.message); }
   try { insightsSyncIntervalId = startInsightsSyncScheduler(); } catch (e) { console.error('Error starting insights sync scheduler:', e.message); }
   try { tokenRefreshIntervalId = startTokenRefreshScheduler(); } catch (e) { console.error('Error starting token refresh scheduler:', e.message); }
@@ -1313,6 +1322,15 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 if (require.main === module) {
+  // Run directly (e.g. `node server.js`, `npm start`, or PM2): bind the port and
+  // start the schedulers — this is the always-on / persistent-host path.
   startServer();
+} else if (String(process.env.ENABLE_SCHEDULERS).toLowerCase() === 'true' && !process.env.VERCEL) {
+  // App was imported by a custom server/process wrapper on a PERSISTENT host
+  // (not Vercel serverless). Start the background schedulers without binding a
+  // second HTTP port, so lead sync still runs continuously. Vercel is excluded
+  // because setInterval cannot survive between stateless function invocations.
+  console.log('[Schedulers] ENABLE_SCHEDULERS=true and not Vercel — starting schedulers in imported mode.');
+  startSchedulers();
 }
 module.exports = app;
