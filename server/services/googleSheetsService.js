@@ -25,7 +25,28 @@ function loadCredentials() {
     }
   }
 
-  // Option 2: path to key file
+  // Option 2: email + private key as SEPARATE env vars.
+  // This is how the deployed/live host supplies credentials (see render.yaml:
+  // GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY), because a
+  // full multi-line JSON file is awkward to store in an env-var dashboard. The
+  // local machine uses the JSON file below, so this path is inert locally — it
+  // only activates when BOTH vars are present (i.e. in production).
+  const saEmail = (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || '').trim();
+  let saPrivateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || process.env.GOOGLE_PRIVATE_KEY || '';
+  if (saEmail && saPrivateKey) {
+    saPrivateKey = saPrivateKey.trim();
+    // Dashboards often wrap the value in surrounding quotes — strip them.
+    if ((saPrivateKey.startsWith('"') && saPrivateKey.endsWith('"')) ||
+        (saPrivateKey.startsWith("'") && saPrivateKey.endsWith("'"))) {
+      saPrivateKey = saPrivateKey.slice(1, -1);
+    }
+    // Env-stored private keys keep literal "\n" sequences — restore real newlines,
+    // otherwise googleapis rejects the key.
+    saPrivateKey = saPrivateKey.replace(/\\n/g, '\n').trim();
+    return { client_email: saEmail, private_key: saPrivateKey };
+  }
+
+  // Option 3: path to key file
   const keyFile = (process.env.GOOGLE_SERVICE_ACCOUNT_FILE || '').trim();
   if (keyFile) {
     const resolved = path.resolve(__dirname, '..', keyFile);
@@ -35,7 +56,7 @@ function loadCredentials() {
     return JSON.parse(fs.readFileSync(resolved, 'utf8'));
   }
 
-  // Option 3: default file location
+  // Option 4: default file location
   const defaultPath = path.resolve(__dirname, '../credentials/google-service-account.json');
   if (fs.existsSync(defaultPath)) {
     return JSON.parse(fs.readFileSync(defaultPath, 'utf8'));
