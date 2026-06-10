@@ -71,6 +71,10 @@ app.use("/api/youtube", youtubeInsightsRoutes);
 const conversionsRoutes = require("./routes/conversions");
 app.use("/api/conversions", conversionsRoutes);
 
+// Page Visit / User Activity Tracking (records visits + sessions; admin analytics)
+const activityRoutes = require("./routes/activityTracking");
+app.use("/api/activity", activityRoutes);
+
 // Leads → Google Sheets real-time sync (webhook + scheduler + backfill)
 const leadsSyncRoutes = require("./routes/leadsSync");
 app.use("/api/leads-sync", leadsSyncRoutes);

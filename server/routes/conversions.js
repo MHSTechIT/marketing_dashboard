@@ -37,6 +37,14 @@ function normCampaignName(name) {
   return String(name || '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
+// Conversion Mode bucket (from the Paid leads sheet column G). The sheet uses
+// clean "Online" / "Offline" labels; anything that isn't explicitly "Online"
+// (incl. the handful of blanks) is treated as Offline so that, by construction,
+// Total Conversions = Online + Offline always holds.
+function conversionModeBucket(mode) {
+  return /online/i.test(String(mode || '')) ? 'online' : 'offline';
+}
+
 // UTC-midnight ms of a lead's IST calendar day (so it compares with paidDateMs).
 function leadDateMs(row) {
   const t = row.created_time || row.time_utc || row.TimeUtc;
@@ -175,21 +183,45 @@ router.get('/by-campaign', async (req, res) => {
     // selected period, 30-day window, and strict campaign_id all applied inside.)
     const { byPhone, scanned } = resolveLastTouchByPhone(leads, rowsByPhone, from, to);
 
+    // Totals (Total = Online + Offline) plus per-mode breakdowns keyed by both
+    // campaign_id (primary) and normalized campaign name (fallback).
     const byCampaignId = {};
+    const byCampaignIdOnline = {};
+    const byCampaignIdOffline = {};
     const byCampaignName = {};
-    for (const { lead } of byPhone.values()) {
+    const byCampaignNameOnline = {};
+    const byCampaignNameOffline = {};
+    let totalOnline = 0;
+    let totalOffline = 0;
+    for (const { lead, paidRow } of byPhone.values()) {
       const cid = lead.campaign_id ? String(lead.campaign_id) : '';
       const cnameKey = normCampaignName(lead.campaign);
-      if (cid) byCampaignId[cid] = (byCampaignId[cid] || 0) + 1;
-      if (cnameKey) byCampaignName[cnameKey] = (byCampaignName[cnameKey] || 0) + 1;
+      const isOnline = conversionModeBucket(paidRow.conversionMode) === 'online';
+      if (isOnline) totalOnline++; else totalOffline++;
+      if (cid) {
+        byCampaignId[cid] = (byCampaignId[cid] || 0) + 1;
+        if (isOnline) byCampaignIdOnline[cid] = (byCampaignIdOnline[cid] || 0) + 1;
+        else byCampaignIdOffline[cid] = (byCampaignIdOffline[cid] || 0) + 1;
+      }
+      if (cnameKey) {
+        byCampaignName[cnameKey] = (byCampaignName[cnameKey] || 0) + 1;
+        if (isOnline) byCampaignNameOnline[cnameKey] = (byCampaignNameOnline[cnameKey] || 0) + 1;
+        else byCampaignNameOffline[cnameKey] = (byCampaignNameOffline[cnameKey] || 0) + 1;
+      }
     }
 
     res.json({
       ok: true,
       from, to,
       byCampaignId,
+      byCampaignIdOnline,
+      byCampaignIdOffline,
       byCampaignName,
+      byCampaignNameOnline,
+      byCampaignNameOffline,
       totalMatched: byPhone.size,
+      totalOnline,
+      totalOffline,
       totalLeads: leads.length,
       scanned,
       paidSetSize: paid.size,

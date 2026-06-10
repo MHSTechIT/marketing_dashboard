@@ -18,6 +18,8 @@ import UniqueLeads from "./pages/UniqueLeads";
 import HighFiveLanding from "./pages/HighFiveLanding";
 import TeamManagement from "./pages/TeamManagement";
 import ManagePermissions from "./pages/ManagePermissions";
+import PageVisitTracking from "./pages/PageVisitTracking";
+import ActivityTracker from "./components/ActivityTracker";
 
 export default function App() {
   return (
@@ -30,6 +32,7 @@ export default function App() {
           path="/*"
           element={
             <ProtectedRoute>
+              <ActivityTracker />
               <Sidebar>
                 <Routes>
                   <Route path="/" element={<AdsDashboardOptionA />} />
@@ -43,6 +46,7 @@ export default function App() {
                   <Route path="/report/daily" element={<Report />} />
                   <Route path="/high-five" element={<HighFiveLanding />} />
                   <Route path="/team-management" element={<TeamManagement />} />
+                  <Route path="/page-visit-tracking" element={<PageVisitTracking />} />
                   <Route path="/manage-permissions/:userId" element={<ManagePermissions />} />
                 </Routes>
               </Sidebar>

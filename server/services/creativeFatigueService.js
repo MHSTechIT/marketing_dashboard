@@ -1,13 +1,18 @@
 /**
- * Creative Fatigue (MHS creative_state.md — March 2026)
+ * Creative Fatigue (MHS — PERFORMANCE-ONLY, June 2026)
  *
- * Fatigue Score = (CTR Drop × 0.4) + (Days/Lifespan × 0.4) + (Hook Drop × 0.2)
- *   — CTR Drop & Hook Drop: % decline vs prior window (0–100 capped).
- *   — Days/Lifespan: % of adjusted lifespan consumed (capped at 150).
- * Lifespan: Adjusted = ((Audience × Target Frequency 3) ÷ Daily Reach) × 0.25 (doc).
+ * Fatigue Score = (CTR Drop × 0.5) + (Hook Drop × 0.3) + (CPL Rise × 0.2)
+ *   — CTR Drop  : % CTR decline vs prior window (0–100 capped).
+ *   — Hook Drop : % hook-rate decline vs prior window (0–100 capped).
+ *   — CPL Rise  : % CPL increase vs first-7-days baseline (0–100 capped).
+ *   Score is 0–100; 0 = no measured performance decline (healthy creative).
+ *   Age / lifespan is NO LONGER part of the score — a creative is judged purely
+ *   on how it is performing, not on how long it has been running.
  *
- * Status: 0–40 Fresh, 40–70 Aging, 70–100 Fatigued, 100+ Severe.
- * Weekly audit flags: CTR >30%, hook <15%, CPL vs first-7d >40%, quality below avg, days >21, neg feedback >0.1%.
+ * Status (rescaled to the achievable 0–100 range):
+ *   0–30 Fresh · 30–55 Aging · 55–80 Fatigued · 80–100 Severe.
+ * Weekly audit flags (unchanged, informational only): CTR >30%, hook <15%,
+ *   CPL vs first-7d >40%, quality below avg, days >21, neg feedback >0.1%.
  */
 
 const axios = require('axios');
@@ -37,7 +42,7 @@ async function pConcurrent(tasks, concurrency = 5) {
 }
 
 const META_API_VERSION = process.env.META_API_VERSION || 'v21.0';
-const METHODOLOGY_VERSION = 'Creative_State_MHS_v1.0';
+const METHODOLOGY_VERSION = 'Creative_State_MHS_v2.0_performance_only';
 const TARGET_FREQUENCY = 3;
 const FIRST_7_DAYS = 7;
 const HISTORY_MAX_DAYS_BACK = 400;
@@ -169,20 +174,28 @@ function computeCtrDropPct(ctrCur, ctrPrev) {
 }
 
 /**
- * MHS dashboard score (creative_state.md).
+ * MHS creative fatigue score — PERFORMANCE-ONLY (age/lifespan excluded).
+ * Each input is a 0–100 "decline" signal vs its baseline; weighted sum is 0–100:
+ *   - CTR drop %  (weight 0.5) — primary engagement decline vs prior window
+ *   - Hook drop % (weight 0.3) — video hook decline vs prior window
+ *   - CPL rise %  (weight 0.2) — cost-per-lead increase vs first-7-days (capped 100)
+ * 0 = no measured decline (healthy creative); higher = more fatigued.
  */
-function computeMhsFatigueScore(ctrDropPct, agePressurePct, hookDropPct) {
+function computeMhsFatigueScore(ctrDropPct, hookDropPct, cplIncreasePct) {
   const c = Math.min(100, Math.max(0, Number(ctrDropPct) || 0));
-  const a = Math.min(150, Math.max(0, Number(agePressurePct) || 0));
   const h = Math.min(100, Math.max(0, Number(hookDropPct) || 0));
-  return c * 0.4 + a * 0.4 + h * 0.2;
+  const p = Math.min(100, Math.max(0, Number(cplIncreasePct) || 0));
+  return c * 0.5 + h * 0.3 + p * 0.2;
 }
 
 function getMhsFatigueStatus(score) {
   const s = Number(score) || 0;
-  if (s > 100) return 'Severe';
-  if (s >= 70) return 'Fatigued';
-  if (s >= 40) return 'Aging';
+  // Performance-only bands, rescaled to the achievable 0–100 range (age removed).
+  // A creative with no measured decline scores 0 → Fresh; it only escalates as
+  // its CTR / hook / CPL actually deteriorate.
+  if (s >= 80) return 'Severe';
+  if (s >= 55) return 'Fatigued';
+  if (s >= 30) return 'Aging';
   return 'Fresh';
 }
 
@@ -551,7 +564,10 @@ async function runFatigueAnalysis(opts = {}) {
         agePressurePct = Math.min(100, (daysRunning / 28) * 100);
       }
 
-      const mhsScore = computeMhsFatigueScore(ctrDropPct, agePressurePct, hookDropPct);
+      // Performance-only fatigue: CTR drop + Hook drop + CPL rise. Age pressure is
+      // still computed above for the informational column but no longer feeds the score.
+      const cplRisePct = cplIncreaseFirst7Pct != null ? cplIncreaseFirst7Pct : 0;
+      const mhsScore = computeMhsFatigueScore(ctrDropPct, hookDropPct, cplRisePct);
       const status = getMhsFatigueStatus(mhsScore);
 
       const weekly_audit = buildWeeklyAuditFlags({

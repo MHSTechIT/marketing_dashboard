@@ -1130,10 +1130,50 @@ const defaultReelsData = {
     last_30_days: { name: '—', headlineLine: '', subtitle: '', platform: 'Instagram', reach: 0, engagements: 0, saves: 0, hookRate: 0, video_avg_time_watched: 0, engagementRatePct: 0, reason: 'Loading…', action: 'MONITOR', thumbnail_url: '', permalink: '', timestamp: '', snapshotFallbackNote: '' }
 };
 
+/**
+ * Persisted cache of the last completed analysis, keyed by date preset. Lets the
+ * page show the last result INSTANTLY on open instead of waiting on the slow live
+ * fetch — the heavy fetch then runs only on an explicit Refresh, in the background.
+ */
+const AI_CACHE_KEY = 'mhs_ai_insights_cache_v1';
+function loadAiInsightsCache() {
+    try { const raw = localStorage.getItem(AI_CACHE_KEY); return raw ? JSON.parse(raw) : {}; }
+    catch (_) { return {}; }
+}
+function saveAiInsightsCache(presetId, payload) {
+    try {
+        const all = loadAiInsightsCache();
+        all[presetId] = { ...payload, savedAt: Date.now() };
+        localStorage.setItem(AI_CACHE_KEY, JSON.stringify(all));
+    } catch (_) { /* storage full / unavailable — ignore */ }
+}
+
+/** Cache for the Lead-Saturation / Creative-Fatigue panels, keyed by date range. */
+const AI_SECONDARY_CACHE_KEY = 'mhs_ai_secondary_cache_v1';
+function loadSecondaryCache() {
+    try { const raw = localStorage.getItem(AI_SECONDARY_CACHE_KEY); return raw ? JSON.parse(raw) : {}; }
+    catch (_) { return {}; }
+}
+function saveSecondaryCache(rangeKey, kind, result) {
+    try {
+        const all = loadSecondaryCache();
+        all[rangeKey] = { ...(all[rangeKey] || {}), [kind]: result, savedAt: Date.now() };
+        localStorage.setItem(AI_SECONDARY_CACHE_KEY, JSON.stringify(all));
+    } catch (_) { /* ignore */ }
+}
+
 export default function AIInsights() {
     const [activeTimeWindow, setActiveTimeWindow] = useState('last_30_days');
 
-    const [loading, setLoading] = useState(true);
+    // The page NEVER blocks on open: it shows the cached analysis instantly, or a
+    // "click Refresh" prompt if there's none. The slow live fetch only runs on
+    // Refresh, in the background (so long loads are never in the user's way).
+    const [loading, setLoading] = useState(false);
+    /** Background live-refresh in progress (page stays usable). */
+    const [refreshing, setRefreshing] = useState(false);
+    /** True once we have a displayable analysis (from cache or a completed fetch). */
+    const [hasAnalysis, setHasAnalysis] = useState(false);
+    const hasAnalysisRef = useRef(false);
     /** 'data' = fetching Meta ads/reels, 'ai' = calling Gemini */
     const [loadingPhase, setLoadingPhase] = useState('data');
     const [error, setError] = useState(null);
@@ -1226,12 +1266,16 @@ export default function AIInsights() {
         const gen = ++aiInsightsFetchGenRef.current;
         const isStale = () => gen !== aiInsightsFetchGenRef.current;
 
-        setLoading(true);
+        // Always run in the background — the page is never blocked. `blocking` (no
+        // analysis yet) only controls whether we may populate cards mid-flight.
+        const blocking = !hasAnalysisRef.current;
+        setRefreshing(true);
         setLoadingPhase('data');
         setError(null);
         setQuotaRetrySeconds(null);
         setFilteredAdsSummary(null); // clear stale summary while new data loads
         try {
+            let computedSummary = null;
             const { from: heroFrom, to: heroTo } = resolvedInsightsRange;
             const dateRange = { from: heroFrom, to: heroTo };
             const { from: dataFrom, to: dataTo } = mergeSnapshotDataRange(resolvedInsightsRange);
@@ -1289,14 +1333,15 @@ export default function AIInsights() {
                 const topByCpl = [...adList].filter(a => a.leads > 0).sort((a, b) => a.cpl - b.cpl).slice(0, 5).map(a => ({ name: a.name, campaign: a.campaign, leads: Math.round(a.leads), cpl: +a.cpl.toFixed(2) }));
                 const worstByCpl = [...adList].filter(a => a.leads > 0).sort((a, b) => b.cpl - a.cpl).slice(0, 3).map(a => ({ name: a.name, campaign: a.campaign, leads: Math.round(a.leads), cpl: +a.cpl.toFixed(2) }));
 
-                if (!isStale()) setFilteredAdsSummary({
+                computedSummary = {
                     dateRange: { from: heroFrom, to: heroTo },
                     totalAds: adList.length,
                     totals: { spend: +totals.spend.toFixed(2), leads: Math.round(totals.leads), cpl: +totals.cpl.toFixed(2), ctr: +totals.ctr.toFixed(2), impressions: Math.round(totals.impressions), clicks: Math.round(totals.clicks) },
                     topAdsByLeads: topByLeads,
                     topAdsByCpl: topByCpl,
                     worstAdsByCpl: worstByCpl,
-                });
+                };
+                if (!isStale()) setFilteredAdsSummary(computedSummary);
             }
             // ---
 
@@ -1332,8 +1377,16 @@ export default function AIInsights() {
                 last_30_days: mapAdPickToSlot(bestAds.last_30_days)
             };
             // Show live ad/reel results immediately even if the AI summary step is slow.
-            setAdsData(adsSlotsLocal);
-            setReelsData(reelSlotsLocal);
+            // On a background refresh we DON'T overwrite mid-flight — that avoids blanking
+            // the last good analysis; the final values are committed on success below.
+            if (blocking) {
+                setAdsData(adsSlotsLocal);
+                setReelsData(reelSlotsLocal);
+                // Ads/reels are ready — clear the spinner and show cards now; the AI
+                // insight text fills in after the (slower) Gemini step below.
+                hasAnalysisRef.current = true;
+                setHasAnalysis(true);
+            }
 
             setLoadingPhase('ai');
             const token = getAuthToken();
@@ -1370,12 +1423,23 @@ export default function AIInsights() {
                 return;
             }
             if (!isStale() && json.success && json.data) {
-                if (json.data.adsData) setAdsData(preferLocalAdSlotsIfApiEmpty(adsSlotsLocal, json.data.adsData));
-                if (json.data.reelsData) {
-                    setReelsData(preferLocalReelSlotsIfApiEmpty(reelSlotsLocal, json.data.reelsData));
-                }
-                if (Array.isArray(json.data.insights)) setInsights(json.data.insights);
-                if (Array.isArray(json.data.recommendations)) setRecommendations(json.data.recommendations);
+                const finalAds = json.data.adsData ? preferLocalAdSlotsIfApiEmpty(adsSlotsLocal, json.data.adsData) : adsSlotsLocal;
+                const finalReels = json.data.reelsData ? preferLocalReelSlotsIfApiEmpty(reelSlotsLocal, json.data.reelsData) : reelSlotsLocal;
+                const finalInsights = Array.isArray(json.data.insights) ? json.data.insights : [];
+                const finalRecs = Array.isArray(json.data.recommendations) ? json.data.recommendations : [];
+                setAdsData(finalAds);
+                setReelsData(finalReels);
+                if (Array.isArray(json.data.insights)) setInsights(finalInsights);
+                if (Array.isArray(json.data.recommendations)) setRecommendations(finalRecs);
+                hasAnalysisRef.current = true;
+                setHasAnalysis(true);
+                // Persist so the next page open shows this analysis INSTANTLY.
+                saveAiInsightsCache(insightsDatePreset, {
+                    adsData: finalAds, reelsData: finalReels,
+                    insights: finalInsights, recommendations: finalRecs,
+                    filteredAdsSummary: computedSummary,
+                    lastAnalysedAt: new Date().toISOString(),
+                });
             }
         } catch (err) {
             if (!isStale()) {
@@ -1389,6 +1453,7 @@ export default function AIInsights() {
             if (!isStale()) {
                 setLastAnalysedAt(new Date());
                 setLoading(false);
+                setRefreshing(false);
             }
         }
     }, [resolvedInsightsRange, insightsDatePreset]);
@@ -1422,6 +1487,7 @@ export default function AIInsights() {
                 return;
             }
             setSaturationResult(json);
+            saveSecondaryCache(`${resolvedInsightsRange.from}__${resolvedInsightsRange.to}`, 'saturation', json);
         } catch (err) {
             setSaturationError(err.message || 'Network error');
         } finally {
@@ -1449,6 +1515,7 @@ export default function AIInsights() {
                 return;
             }
             setFatigueResult(json);
+            saveSecondaryCache(`${resolvedInsightsRange.from}__${resolvedInsightsRange.to}`, 'fatigue', json);
         } catch (err) {
             setFatigueError(err.message || 'Network error');
         } finally {
@@ -1499,18 +1566,48 @@ export default function AIInsights() {
         }
     }, [resolvedInsightsRange, loadLeadScores]);
 
+    // On open (and when the date preset changes): show the LAST saved analysis for
+    // that preset instantly from cache — no waiting on the slow live fetch. Only run
+    // the heavy fetch when there is no cached analysis yet (first-ever load). Live
+    // refresh otherwise happens only when the user clicks "Refresh".
     useEffect(() => {
-        fetchAIInsights();
-    }, [fetchAIInsights]);
+        const cached = loadAiInsightsCache()[insightsDatePreset];
+        if (cached && cached.adsData) {
+            setAdsData(cached.adsData);
+            setReelsData(cached.reelsData || defaultReelsData);
+            setInsights(Array.isArray(cached.insights) ? cached.insights : []);
+            setRecommendations(Array.isArray(cached.recommendations) ? cached.recommendations : []);
+            if (cached.filteredAdsSummary) setFilteredAdsSummary(cached.filteredAdsSummary);
+            if (cached.lastAnalysedAt) setLastAnalysedAt(new Date(cached.lastAnalysedAt));
+            hasAnalysisRef.current = true;
+            setHasAnalysis(true);
+            setLoading(false);
+            setError(null);
+        } else {
+            // No cached analysis for this period → DON'T auto-run the slow live fetch.
+            // The page opens instantly with a "click Refresh" prompt; the user runs
+            // the analysis on demand (it then caches for instant future loads).
+            hasAnalysisRef.current = false;
+            setHasAnalysis(false);
+            setLoading(false);
+            setRefreshing(false);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [insightsDatePreset, customCommitted.from, customCommitted.to]);
 
     useEffect(() => {
         loadLeadScores();
     }, [loadLeadScores]);
 
     useEffect(() => {
-        fetchLeadSaturation();
-        fetchCreativeFatigue();
-    }, [fetchLeadSaturation, fetchCreativeFatigue]);
+        // Show the LAST saved saturation/fatigue analysis for this range — do NOT
+        // auto-run on open. The user runs a fresh one on demand via "Run Live Analysis".
+        const key = `${resolvedInsightsRange.from}__${resolvedInsightsRange.to}`;
+        const c = loadSecondaryCache()[key] || {};
+        setSaturationResult(c.saturation || null);
+        setFatigueResult(c.fatigue || null);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [resolvedInsightsRange.from, resolvedInsightsRange.to]);
 
     const currentAd = adsData[activeTimeWindow] || defaultAdsData.last_30_days;
     const rawReel = reelsData[activeTimeWindow];
@@ -2212,20 +2309,29 @@ export default function AIInsights() {
                         type="button"
                         className="ai2-btn-refresh"
                         onClick={() => fetchAIInsights(true)}
-                        disabled={loading}
+                        disabled={loading || refreshing}
                     >
                         <i className="fas fa-sync-alt" />
-                        {loading ? 'Refreshing…' : 'Refresh'}
+                        {(loading || refreshing) ? 'Refreshing…' : 'Refresh'}
                     </button>
                 </div>
             </header>
 
-            {loading && (
+            {!hasAnalysis && ((refreshing || loading) ? (
                 <div className="ai2-loading" aria-busy="true">
                     <div className="ai2-loading-spinner" />
-                    <p>{loadingPhase === 'ai' ? 'Generating AI insights…' : 'Loading ads & reels…'}</p>
+                    <p>{loadingPhase === 'ai'
+                        ? 'Generating AI insights…'
+                        : 'Analyzing your best ads & reels… this runs in the background and can take up to a minute — the rest of the page stays usable.'}</p>
                 </div>
-            )}
+            ) : (
+                <div className="ai2-loading">
+                    <p style={{ textAlign: 'center', color: '#64748b', maxWidth: 560, margin: '0 auto' }}>
+                        No live analysis yet for this period. Click <strong>Refresh</strong> (top-right) to run it —
+                        your result is then saved and loads instantly on future visits.
+                    </p>
+                </div>
+            ))}
 
             {error && !loading && (
                 error === 'BILLING_ERROR' ? (
@@ -2677,7 +2783,7 @@ export default function AIInsights() {
                         )}
                         <small className="ai2-analysis-card-meta">MHS index · Signal 4 · Signal 5</small>
                         <button type="button" className="ai2-btn-secondary" style={{ margin: 0 }} onClick={fetchLeadSaturation} disabled={saturationLoading}>
-                            {saturationLoading ? <><i className="fas fa-spinner fa-spin" /> Analysing…</> : <><i className="fas fa-rotate-right" /> Re-run analysis</>}
+                            {saturationLoading ? <><i className="fas fa-spinner fa-spin" /> Analysing…</> : <><i className="fas fa-rotate-right" /> Run Live Analysis</>}
                         </button>
                     </div>
                 </div>
@@ -2759,7 +2865,7 @@ export default function AIInsights() {
                         )}
                         <small className="ai2-analysis-card-meta">CTR drop×0.4 + lifespan×0.4 + hook×0.2</small>
                         <button type="button" className="ai2-btn-secondary" style={{ margin: 0 }} onClick={fetchCreativeFatigue} disabled={fatigueLoading}>
-                            {fatigueLoading ? <><i className="fas fa-spinner fa-spin" /> Analysing…</> : <><i className="fas fa-rotate-right" /> Re-run analysis</>}
+                            {fatigueLoading ? <><i className="fas fa-spinner fa-spin" /> Analysing…</> : <><i className="fas fa-rotate-right" /> Run Live Analysis</>}
                         </button>
                     </div>
                 </div>
@@ -2813,7 +2919,7 @@ export default function AIInsights() {
                         </table>
                     </div>
                     <p className="ai2-muted ai2-table-footnote mt-2 mb-0" style={{ fontSize: '0.72rem' }}>
-                        Score bands: Fresh 0–40 · Aging 40–70 · Fatigued 70–100 · Severe 100+. Audit = weekly checklist flags (hover for keys).
+                        Score = CTR drop×0.5 + Hook drop×0.3 + CPL rise×0.2 (performance only, age excluded). Bands: Fresh 0–30 · Aging 30–55 · Fatigued 55–80 · Severe 80–100. Audit = weekly checklist flags (hover for keys).
                     </p>
                     </>
                 ) : (

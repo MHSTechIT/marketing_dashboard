@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import './BestPerformingAd.css';
 import DateRangeFilter from '../components/DateRangeFilter';
 import MultiSelectFilter from '../components/MultiSelectFilter';
@@ -25,12 +25,54 @@ const getAuthToken = () => {
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:4000';
 
+// --- Cache-first insights cache (localStorage) -----------------------------
+// The page renders previously-loaded rows INSTANTLY from here, then refreshes
+// in the background — so the user never waits on live Meta calls to see data.
+const BPA_CACHE_PREFIX = 'mhs_bpa_insights_v1';
+const loadBpaCache = (key) => {
+    try {
+        const raw = localStorage.getItem(`${BPA_CACHE_PREFIX}:${key}`);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed?.rows) ? parsed : null;
+    } catch (_) {
+        return null;
+    }
+};
+const saveBpaCache = (key, rows) => {
+    try {
+        localStorage.setItem(`${BPA_CACHE_PREFIX}:${key}`, JSON.stringify({ rows, savedAt: Date.now() }));
+    } catch (_) { /* quota / private mode — non-fatal */ }
+};
+
 // USD to INR conversion rate (update as needed; reserved for future use)
 // eslint-disable-next-line no-unused-vars
 const USD_TO_INR = 83;
 
 // Revenue per conversion (₹) used for ROAS: (Conversion Count * REVENUE_PER_CONVERSION) / Amount spend
 const REVENUE_PER_CONVERSION = 3999;
+
+// Human-readable labels for the Campaign performance table's sortable columns
+// (used in the footer "Sorted by …" hint).
+const SORT_COLUMN_LABELS = {
+    ad_account: 'Ad account',
+    name: 'Campaign name',
+    ad_name: 'Ad name',
+    spend: 'Amount spend',
+    leads: 'Lead Generated from Ad',
+    totalConversions: 'Total Conversion Count',
+    onlineConversions: 'Online Conversion Count',
+    offlineConversions: 'Offline Conversion Count',
+    conversionRate: 'Conversion Rate',
+    ctr: 'CTR',
+    cpl: 'CPL',
+    cpm: 'CPM',
+    hookRate: 'Hook Rate',
+    holdRate: 'Hold Rate',
+    totalRoas: 'Total ROAS',
+    onlineRoas: 'Online ROAS',
+    offlineRoas: 'Offline ROAS',
+};
 
 // Helper to transform Meta "actions" array -> object map (same as Dashboard)
 const transformActions = (actions = []) => {
@@ -85,6 +127,70 @@ const formatPerc = (value) => {
 const formatROAS = (value) => {
     if (value == null || value <= 0) return '—';
     return `${Number(value).toFixed(2)}x`;
+};
+
+// --- Campaign / Ad status badge (Meta effective_status) --------------------
+// Meta returns values like ACTIVE, PAUSED, CAMPAIGN_PAUSED, ADSET_PAUSED,
+// ARCHIVED, DELETED, WITH_ISSUES, DISAPPROVED, IN_REVIEW, etc. We normalize them
+// to a clear label + colour tone for the Campaign performance table.
+const META_STATUS_TONES = {
+    active:   { bg: '#dcfce7', fg: '#166534' },  // green
+    paused:   { bg: '#f1f5f9', fg: '#475569' },  // slate-grey
+    archived: { bg: '#e2e8f0', fg: '#334155' },  // grey
+    issue:    { bg: '#fee2e2', fg: '#991b1b' },  // red
+    pending:  { bg: '#fef9c3', fg: '#854d0e' },  // amber
+    muted:    { bg: 'transparent', fg: '#94a3b8' },
+};
+const formatMetaStatus = (raw) => {
+    const s = String(raw || '').toUpperCase().trim();
+    if (!s) return { label: '', tone: 'muted' };
+    if (s === 'ACTIVE') return { label: 'Active', tone: 'active' };
+    if (s.includes('PAUSED')) return { label: 'Paused', tone: 'paused' };          // PAUSED / CAMPAIGN_PAUSED / ADSET_PAUSED
+    if (s === 'ARCHIVED') return { label: 'Archived', tone: 'archived' };
+    if (s === 'DELETED') return { label: 'Deleted', tone: 'archived' };
+    if (s === 'WITH_ISSUES' || s === 'DISAPPROVED' || s === 'REJECTED') {
+        return { label: s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, ' '), tone: 'issue' };
+    }
+    // IN_REVIEW, PENDING_REVIEW, PREAPPROVED, PENDING_BILLING_INFO, etc.
+    return { label: s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, ' '), tone: 'pending' };
+};
+const renderStatusBadge = (raw) => {
+    const { label, tone } = formatMetaStatus(raw);
+    if (!label) return null; // status not loaded yet / unknown — render nothing
+    const c = META_STATUS_TONES[tone] || META_STATUS_TONES.muted;
+    return (
+        <span
+            title={String(raw)}
+            style={{
+                display: 'inline-block', marginTop: 3, padding: '1px 7px', borderRadius: 10,
+                fontSize: '0.66rem', fontWeight: 600, lineHeight: 1.5,
+                background: c.bg, color: c.fg, whiteSpace: 'nowrap',
+            }}
+        >
+            {label}
+        </span>
+    );
+};
+
+// Fetch campaign + ad effective_status maps for the displayed campaigns. Reads the
+// cached meta_campaigns / meta_ads DB tables via /api/meta/statuses (no live Meta).
+const fetchCampaignAdStatuses = async ({ adAccountIds, campaignIds, adIds }) => {
+    if (!adAccountIds || adAccountIds.length === 0) return { campaignStatus: {}, adStatus: {} };
+    try {
+        const token = getAuthToken();
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const res = await fetch(`${API_BASE}/api/meta/statuses`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ ad_account_ids: adAccountIds, campaign_ids: campaignIds || [], ad_ids: adIds || [] }),
+        });
+        const data = await res.json().catch(() => ({}));
+        return { campaignStatus: data.campaignStatus || {}, adStatus: data.adStatus || {} };
+    } catch (e) {
+        console.warn('[BestPerformingAd] statuses fetch error:', e.message);
+        return { campaignStatus: {}, adStatus: {} };
+    }
 };
 
 // Default date range: same as Ads Analytics Dashboard (last 7 complete days, excluding today)
@@ -289,15 +395,17 @@ const fetchConversionCounts = async ({ from, to }) => {
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.ok) {
             console.warn('[BestPerformingAd] Conversion counts failed:', data.error || res.statusText);
-            return { byCampaignId: {}, byCampaignName: {} };
+            return { byCampaignId: {}, byCampaignName: {}, byCampaignIdOnline: {}, byCampaignIdOffline: {} };
         }
         return {
             byCampaignId: data.byCampaignId || {},
-            byCampaignName: data.byCampaignName || {}
+            byCampaignName: data.byCampaignName || {},
+            byCampaignIdOnline: data.byCampaignIdOnline || {},
+            byCampaignIdOffline: data.byCampaignIdOffline || {}
         };
     } catch (e) {
         console.warn('[BestPerformingAd] Conversion counts error:', e.message);
-        return { byCampaignId: {}, byCampaignName: {} };
+        return { byCampaignId: {}, byCampaignName: {}, byCampaignIdOnline: {}, byCampaignIdOffline: {} };
     }
 };
 
@@ -356,15 +464,24 @@ export default function BestPerformingAd() {
     const [adAccountsLoading, setAdAccountsLoading] = useState(true);
     const [insightsData, setInsightsData] = useState([]);
     const [dataLoading, setDataLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);      // background refresh in progress (non-blocking)
+    const [lastUpdated, setLastUpdated] = useState(null);     // ms timestamp of the data currently shown
+    const [manualLiveRefresh, setManualLiveRefresh] = useState(0); // bumped by the "Run Live Data" button
     const [error, setError] = useState(null);
     // Automated Conversion Count: matched-lead counts keyed by campaign_id (and a
     // normalized-campaign-name fallback), computed server-side by phone-matching
     // ad leads against the "Paid leads" sheet.
     const [conversionsById, setConversionsById] = useState({});
     const [conversionsByName, setConversionsByName] = useState({});
+    const [conversionsByIdOnline, setConversionsByIdOnline] = useState({});   // Online conversions per campaign_id
+    const [conversionsByIdOffline, setConversionsByIdOffline] = useState({}); // Offline conversions per campaign_id
     const [conversionsLoading, setConversionsLoading] = useState(false);
+    const [campaignStatusById, setCampaignStatusById] = useState({}); // campaign_id → effective_status
+    const [adStatusById, setAdStatusById] = useState({});             // ad_id → effective_status
     const [selectedAdAccounts, setSelectedAdAccounts] = useState([]);
     const [drillDown, setDrillDown] = useState({ open: false, loading: false, error: null, campaignId: '', campaignName: '', leads: [] });
+    // Campaign-performance table sorting. key=null → default sort (Total ROAS desc).
+    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'desc' });
 
     // Load ad accounts on mount
     useEffect(() => {
@@ -441,63 +558,105 @@ export default function BestPerformingAd() {
         if (filtered.length !== selectedAdAccounts.length) setSelectedAdAccounts(filtered);
     }, [selectedProject, selectedProjectAccountIds, selectedAdAccounts]);
 
-    // Fetch insights: same logic as Dashboard — Date Range + Project + Ad Account; one request per account when multiple accounts.
+    // Stable cache key for the current Date-Range + Project + Ad-Account selection.
+    // Built from the user's intent (not from transient adAccounts load state) so the
+    // same selection always hits the same cache entry.
+    const insightsCacheKey = useMemo(() => {
+        const acc = selectedAdAccounts.length > 0
+            ? [...selectedAdAccounts].sort().join(',')
+            : (selectedProject ? `proj:${selectedProject}` : 'all');
+        return `${filters.startDate || ''}|${filters.endDate || ''}|${selectedProject || ''}|${acc}`;
+    }, [filters.startDate, filters.endDate, selectedProject, selectedAdAccounts]);
+
+    // Fetch insights for the current selection (same logic as Dashboard).
+    //   live=false → DB cache (server-side) — fast, used for the background refresh.
+    //   live=true  → fresh from Meta (~7s+/account) — only on the "Run Live Data" button.
+    const fetchRows = useCallback(async (live) => {
+        const fromDate = filters.startDate || null;
+        const toDate = filters.endDate || null;
+        const opts = { startDate: filters.startDate, endDate: filters.endDate, live };
+        let metaRows = [];
+        if (accountsForFetch.length > 0) {
+            metaRows = await fetchAllAccountsInsightsData({ ...opts, accounts: accountsForFetch });
+        } else if (selectedProject === '' && specifiedAdAccounts.length === 0) {
+            metaRows = await fetchInsightsData({ ...opts, adAccountId: undefined });
+        } else if (selectedProject && selectedProjectAdAccountIds) {
+            metaRows = await fetchInsightsData({ ...opts, adAccountId: selectedProjectAdAccountIds });
+        }
+        // Merge Wix analytics (same as Dashboard) so card values match
+        if (fromDate && toDate) {
+            const wixResult = await fetchWixAnalytics({ from: fromDate, to: toDate });
+            const wixRows = wixResult.rows || [];
+            if (wixRows.length > 0) metaRows = [...(metaRows || []), ...wixRows];
+        }
+        return filterByActiveStatus(metaRows || []);
+    }, [filters.startDate, filters.endDate, selectedProject, selectedProjectAdAccountIds, specifiedAdAccounts, accountsForFetch]);
+
+    // CACHE-FIRST load: show previously-saved rows INSTANTLY (no "Loading..."),
+    // then silently refresh from the server DB in the background. The page never
+    // blocks on a network round-trip when cached data exists.
     useEffect(() => {
         let cancelled = false;
-        setDataLoading(true);
         setError(null);
 
-        const loadInsights = async () => {
+        // 1) Paint cached rows immediately.
+        const cached = loadBpaCache(insightsCacheKey);
+        if (cached) {
+            setInsightsData(cached.rows);
+            setLastUpdated(cached.savedAt || null);
+            setDataLoading(false);
+        } else {
+            // First time for this selection — show the loaders until the DB responds.
+            setDataLoading(true);
+        }
+
+        // 2) Background DB refresh — non-blocking. Keep cached rows if it fails.
+        setRefreshing(true);
+        (async () => {
             try {
-                const opts = {
-                    startDate: filters.startDate,
-                    endDate: filters.endDate,
-                    live: true
-                };
-                let metaRows = [];
-                if (accountsForFetch.length > 0) {
-                    metaRows = await fetchAllAccountsInsightsData({
-                        ...opts,
-                        accounts: accountsForFetch
-                    });
-                    if (cancelled) return;
-                } else if (selectedProject === '' && specifiedAdAccounts.length === 0) {
-                    metaRows = await fetchInsightsData({
-                        ...opts,
-                        adAccountId: undefined
-                    });
-                    if (cancelled) return;
-                } else if (selectedProject && selectedProjectAdAccountIds) {
-                    metaRows = await fetchInsightsData({
-                        ...opts,
-                        adAccountId: selectedProjectAdAccountIds
-                    });
-                    if (cancelled) return;
+                const dbRows = await fetchRows(false);
+                if (cancelled) return;
+                if (dbRows && (dbRows.length > 0 || !cached)) {
+                    setInsightsData(dbRows);
+                    saveBpaCache(insightsCacheKey, dbRows);
+                    setLastUpdated(Date.now());
                 }
-                // Merge Wix analytics (same as Dashboard) so card values match
-                const fromDate = filters.startDate || null;
-                const toDate = filters.endDate || null;
-                if (fromDate && toDate) {
-                    const wixResult = await fetchWixAnalytics({ from: fromDate, to: toDate });
-                    const wixRows = wixResult.rows || [];
-                    if (wixRows.length > 0) metaRows = [...(metaRows || []), ...wixRows];
-                    if (cancelled) return;
-                }
-                // Filter to ACTIVE campaign/ad only (same as Dashboard)
-                const filtered = filterByActiveStatus(metaRows || []);
-                setInsightsData(filtered);
-                setDataLoading(false);
             } catch (e) {
-                if (!cancelled) {
+                if (!cancelled && !cached) {
                     console.error("Failed to load insights:", e);
                     setError(e.message || "Failed to load insights data.");
+                }
+            } finally {
+                if (!cancelled) {
                     setDataLoading(false);
+                    setRefreshing(false);
                 }
             }
-        };
-        loadInsights();
+        })();
+
         return () => { cancelled = true; };
-    }, [filters.startDate, filters.endDate, selectedProject, selectedProjectAdAccountIds, specifiedAdAccounts, accountsForFetch]);
+    }, [insightsCacheKey, fetchRows]);
+
+    // ON-DEMAND live refresh — only when the user clicks "Run Live Data". Pulls the
+    // freshest data straight from Meta and updates the cache. Never runs automatically.
+    useEffect(() => {
+        if (manualLiveRefresh === 0) return; // skip on initial mount
+        let cancelled = false;
+        setRefreshing(true);
+        (async () => {
+            try {
+                const liveRows = await fetchRows(true);
+                if (!cancelled && liveRows && liveRows.length > 0) {
+                    setInsightsData(liveRows);
+                    saveBpaCache(insightsCacheKey, liveRows);
+                    setLastUpdated(Date.now());
+                }
+            } catch (_) { /* keep whatever is already shown */ }
+            finally { if (!cancelled) setRefreshing(false); }
+        })();
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [manualLiveRefresh]);
 
     // Fetch automated Conversion Counts whenever the date range changes. Counts are
     // keyed by campaign_id, so they apply to whichever campaigns the table shows
@@ -506,10 +665,12 @@ export default function BestPerformingAd() {
         let cancelled = false;
         setConversionsLoading(true);
         fetchConversionCounts({ from: filters.startDate, to: filters.endDate })
-            .then(({ byCampaignId, byCampaignName }) => {
+            .then(({ byCampaignId, byCampaignName, byCampaignIdOnline, byCampaignIdOffline }) => {
                 if (cancelled) return;
                 setConversionsById(byCampaignId || {});
                 setConversionsByName(byCampaignName || {});
+                setConversionsByIdOnline(byCampaignIdOnline || {});
+                setConversionsByIdOffline(byCampaignIdOffline || {});
             })
             .finally(() => { if (!cancelled) setConversionsLoading(false); });
         return () => { cancelled = true; };
@@ -529,6 +690,18 @@ export default function BestPerformingAd() {
         const cid = row.campaign_id != null ? String(row.campaign_id) : '';
         if (cid && conversionsById[cid] != null) return conversionsById[cid];
         return 0;
+    };
+    // Online / Offline split of the conversion count for a campaign row (same strict
+    // campaign_id keying). Total Conversion Count = Online + Offline by construction.
+    const getOnlineConversionsForRow = (row) => {
+        if (!row) return 0;
+        const cid = row.campaign_id != null ? String(row.campaign_id) : '';
+        return (cid && conversionsByIdOnline[cid] != null) ? conversionsByIdOnline[cid] : 0;
+    };
+    const getOfflineConversionsForRow = (row) => {
+        if (!row) return 0;
+        const cid = row.campaign_id != null ? String(row.campaign_id) : '';
+        return (cid && conversionsByIdOffline[cid] != null) ? conversionsByIdOffline[cid] : 0;
     };
 
     // Calculate totals from insights data
@@ -673,6 +846,7 @@ export default function BestPerformingAd() {
                     campaign_id: r.campaign_id,
                     name: r.campaign || 'Unknown Campaign',
                     ad_name: firstAdName,
+                    ad_id: r.ad_id || null,   // the representative (first) ad — used for Ad Status
                     ad_account_id: r.ad_account_id || null,
                     ad_account_name: r.ad_account_name || '',
                     spend: 0,
@@ -747,6 +921,114 @@ export default function BestPerformingAd() {
     const totalConversionCount = useMemo(() => {
         return campaignData.reduce((sum, row) => sum + (Number(getConversionsForRow(row)) || 0), 0);
     }, [campaignData, conversionsById, conversionsByName]);
+
+    // Online / Offline conversion totals for the KPI sub-line (Total = Online + Offline).
+    const totalOnlineConversions = useMemo(() => {
+        return campaignData.reduce((sum, row) => sum + (Number(getOnlineConversionsForRow(row)) || 0), 0);
+    }, [campaignData, conversionsByIdOnline]);
+    const totalOfflineConversions = useMemo(() => {
+        return campaignData.reduce((sum, row) => sum + (Number(getOfflineConversionsForRow(row)) || 0), 0);
+    }, [campaignData, conversionsByIdOffline]);
+
+    // Fetch Campaign Status + Ad Status (Meta effective_status) for the campaigns
+    // currently in the table. Keyed off the campaign_id set so it only refetches
+    // when the displayed campaigns change.
+    const campaignIdsKey = useMemo(
+        () => campaignData.map((r) => r.campaign_id).filter(Boolean).join(','),
+        [campaignData]
+    );
+    useEffect(() => {
+        let cancelled = false;
+        const adAccountIds = [...new Set(
+            campaignData.map((r) => String(r.ad_account_id || '').replace(/^act_/, '')).filter(Boolean)
+        )];
+        const campaignIds = [...new Set(
+            campaignData.map((r) => String(r.campaign_id || '')).filter(Boolean)
+        )];
+        const adIds = [...new Set(
+            campaignData.map((r) => String(r.ad_id || '')).filter(Boolean)
+        )];
+        if (adAccountIds.length === 0 || campaignIds.length === 0) return;
+        fetchCampaignAdStatuses({ adAccountIds, campaignIds, adIds }).then(({ campaignStatus, adStatus }) => {
+            if (cancelled) return;
+            setCampaignStatusById(campaignStatus || {});
+            setAdStatusById(adStatus || {});
+        });
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [campaignIdsKey]);
+
+    // --- Column sorting for the Campaign performance table -------------------
+    // String columns sort alphabetically; everything else numerically. Computed
+    // columns (conversions split, the three ROAS values) mirror exactly what the
+    // body renders, so the sort always matches the displayed numbers.
+    const SORT_STRING_COLUMNS = useMemo(() => new Set(['ad_account', 'name', 'ad_name']), []);
+    const getSortValue = (row, key) => {
+        const online = Number(getOnlineConversionsForRow(row)) || 0;
+        const offline = Number(getOfflineConversionsForRow(row)) || 0;
+        const total = (online + offline) || (Number(getConversionsForRow(row)) || 0);
+        switch (key) {
+            case 'ad_account':         return row.ad_account_display || '';
+            case 'name':               return row.name || '';
+            case 'ad_name':            return row.ad_name || '';
+            case 'spend':              return row.spend || 0;
+            case 'leads':              return row.leads || 0;
+            case 'totalConversions':   return total;
+            case 'onlineConversions':  return online;
+            case 'offlineConversions': return offline;
+            case 'conversionRate':     return row.leads > 0 ? (total / row.leads) * 100 : 0;
+            case 'ctr':                return row.ctr || 0;
+            case 'cpl':                return row.cpl || 0;
+            case 'cpm':                return row.cpm || 0;
+            case 'hookRate':           return row.hookRate != null ? row.hookRate : -Infinity;
+            case 'holdRate':           return row.holdRate != null ? row.holdRate : -Infinity;
+            case 'totalRoas':          return row.spend > 0 ? (total * REVENUE_PER_CONVERSION) / row.spend : -Infinity;
+            case 'onlineRoas':         return row.spend > 0 ? (online * REVENUE_PER_CONVERSION) / row.spend : -Infinity;
+            case 'offlineRoas':        return row.spend > 0 ? (offline * REVENUE_PER_CONVERSION) / row.spend : -Infinity;
+            default:                   return 0;
+        }
+    };
+    // Click a header: same column toggles asc/desc; a new column starts desc for
+    // numbers (high→low) and asc for text (A→Z).
+    const handleSort = (key, type = 'number') => {
+        setSortConfig((prev) => {
+            if (prev.key === key) {
+                return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+            }
+            return { key, direction: type === 'string' ? 'asc' : 'desc' };
+        });
+    };
+    const sortedCampaignData = useMemo(() => {
+        if (!sortConfig.key) return campaignDataForTable;
+        const dir = sortConfig.direction === 'asc' ? 1 : -1;
+        const isString = SORT_STRING_COLUMNS.has(sortConfig.key);
+        return [...campaignDataForTable].sort((a, b) => {
+            const va = getSortValue(a, sortConfig.key);
+            const vb = getSortValue(b, sortConfig.key);
+            if (isString) return String(va).localeCompare(String(vb)) * dir;
+            return (va < vb ? -1 : va > vb ? 1 : 0) * dir;
+        });
+        // getSortValue closes over the conversion maps; listing them keeps the sort fresh.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [campaignDataForTable, sortConfig, conversionsById, conversionsByIdOnline, conversionsByIdOffline, SORT_STRING_COLUMNS]);
+
+    // Sortable header cell: click to sort, with an active ▲/▼ indicator and a faint
+    // ⇅ hint on inactive columns.
+    const sortableTh = (label, key, type = 'number') => {
+        const active = sortConfig.key === key;
+        const indicator = active ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '⇅';
+        return (
+            <th
+                key={key}
+                onClick={() => handleSort(key, type)}
+                style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
+                title={`Sort by ${label}`}
+            >
+                {label}
+                <span style={{ marginLeft: 4, fontSize: '0.78em', opacity: active ? 1 : 0.35 }}>{indicator}</span>
+            </th>
+        );
+    };
 
     // Date range filter handler (same as Ads Analytics Dashboard)
     const handleDateRangeApply = (payload) => {
@@ -934,6 +1216,36 @@ export default function BestPerformingAd() {
                         loading={adAccountsLoading}
                     />
                 </div>
+
+                {/* 4. Live Data — cached data shows instantly; live Meta data is fetched only on demand */}
+                <div className="filter-block filter-block-live">
+                    <label className="filter-label"><span className="filter-emoji">⚡</span> Live Data</label>
+                    <button
+                        type="button"
+                        className="filter-time-range-btn d-flex align-items-center justify-content-center gap-2 px-3 py-2 border shadow-sm cursor-pointer"
+                        onClick={() => setManualLiveRefresh((n) => n + 1)}
+                        disabled={refreshing}
+                        title={lastUpdated ? `Showing data as of ${new Date(lastUpdated).toLocaleString()}. Click to fetch the latest live data from Meta.` : 'Fetch the latest live data from Meta'}
+                        style={{
+                            borderRadius: '5px',
+                            color: 'var(--text, #64748b)',
+                            borderColor: 'rgba(0, 0, 0, 0.1)',
+                            minWidth: '160px',
+                            border: '1px solid rgba(0, 0, 0, 0.1)',
+                            background: 'var(--card, #ffffff)',
+                            cursor: refreshing ? 'wait' : 'pointer',
+                            width: '100%'
+                        }}
+                    >
+                        <i className={`fas fa-sync-alt ${refreshing ? 'fa-spin' : ''} text-secondary`}></i>
+                        <span className="fw-medium small text-dark">{refreshing ? 'Refreshing…' : 'Run Live Data'}</span>
+                    </button>
+                    {lastUpdated && (
+                        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #94a3b8)', marginTop: '2px' }}>
+                            Updated {new Date(lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                    )}
+                </div>
             </div>
 
             {/* --- KPI CARDS ROW (same structure as Ads Analytics Dashboard) --- */}
@@ -995,14 +1307,16 @@ export default function BestPerformingAd() {
                     </div>
                 </div>
 
-                {/* 6. Conversion Count */}
+                {/* 6. Total Conversion Count (Online + Offline) */}
                 <div className="col-6 col-md-4 col-lg-2">
                     <div className="kpi-card kpi-card-teal">
                         <div className="kpi-card-body">
                             <div className="kpi-icon">✅</div>
-                            <small className="kpi-label">Conversion Count</small>
+                            <small className="kpi-label">Total Conversion Count</small>
                             <div className="kpi-value">{dataLoading ? 'Loading...' : formatNum(totalConversionCount)}</div>
-                            <small className="kpi-subtitle">Total Conversions</small>
+                            <small className="kpi-subtitle">
+                                {conversionsLoading ? 'Total Conversions' : `Online ${formatNum(totalOnlineConversions)} · Offline ${formatNum(totalOfflineConversions)}`}
+                            </small>
                         </div>
                     </div>
                 </div>
@@ -1184,49 +1498,65 @@ export default function BestPerformingAd() {
                 <table className="performance-table">
                     <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc' }}>
                         <tr>
-                            <th>Ad account</th>
-                            <th>Campaign name</th>
-                            <th>Ad name</th>
-                            <th>Amount spend</th>
-                            <th>Lead Generated from Ad</th>
-                            <th>Conversion Count</th>
-                            <th>Conversion Rate</th>
-                            <th>CTR</th>
-                            <th>CPL</th>
-                            <th>CPM</th>
-                            <th>Hook Rate</th>
-                            <th>Hold Rate</th>
-                            <th>ROAS</th>
+                            {sortableTh('Ad account', 'ad_account', 'string')}
+                            {sortableTh('Campaign name', 'name', 'string')}
+                            {sortableTh('Ad name', 'ad_name', 'string')}
+                            {sortableTh('Amount spend', 'spend')}
+                            {sortableTh('Lead Generated from Ad', 'leads')}
+                            {sortableTh('Total Conversion Count', 'totalConversions')}
+                            {sortableTh('Online Conversion Count', 'onlineConversions')}
+                            {sortableTh('Offline Conversion Count', 'offlineConversions')}
+                            {sortableTh('Conversion Rate', 'conversionRate')}
+                            {sortableTh('CTR', 'ctr')}
+                            {sortableTh('CPL', 'cpl')}
+                            {sortableTh('CPM', 'cpm')}
+                            {sortableTh('Hook Rate', 'hookRate')}
+                            {sortableTh('Hold Rate', 'holdRate')}
+                            {sortableTh('Total ROAS', 'totalRoas')}
+                            {sortableTh('Online ROAS', 'onlineRoas')}
+                            {sortableTh('Offline ROAS', 'offlineRoas')}
                         </tr>
                     </thead>
                     <tbody>
                         {dataLoading ? (
                             <tr>
-                                <td colSpan="13" className="text-center py-4">
+                                <td colSpan="17" className="text-center py-4">
                                     <div className="spinner-border spinner-border-sm text-primary" role="status">
                                         <span className="visually-hidden">Loading...</span>
                                     </div>
                                     <span className="ms-2">Loading campaign data...</span>
                                 </td>
                             </tr>
-                        ) : campaignDataForTable.length === 0 ? (
+                        ) : sortedCampaignData.length === 0 ? (
                             <tr>
-                                <td colSpan="13" className="text-center py-4 text-muted">
+                                <td colSpan="17" className="text-center py-4 text-muted">
                                     No campaign data available. Please select filters or check your Meta API connection.
                                 </td>
                             </tr>
                         ) : (
-                            campaignDataForTable.map((row) => {
-                                const effectiveConversions = getConversionsForRow(row);
+                            sortedCampaignData.map((row) => {
+                                const onlineConversions = getOnlineConversionsForRow(row);
+                                const offlineConversions = getOfflineConversionsForRow(row);
+                                // Total = Online + Offline (server guarantees this; fall back to the
+                                // total map if the split is momentarily unavailable).
+                                const effectiveConversions = (onlineConversions + offlineConversions) || getConversionsForRow(row);
                                 const effectiveConversionRate = row.leads > 0
                                     ? (effectiveConversions / row.leads) * 100
                                     : 0;
-                                const effectiveRoas = row.spend > 0 ? (effectiveConversions * REVENUE_PER_CONVERSION) / row.spend : null;
+                                const totalRoas = row.spend > 0 ? (effectiveConversions * REVENUE_PER_CONVERSION) / row.spend : null;
+                                const onlineRoas = row.spend > 0 ? (onlineConversions * REVENUE_PER_CONVERSION) / row.spend : null;
+                                const offlineRoas = row.spend > 0 ? (offlineConversions * REVENUE_PER_CONVERSION) / row.spend : null;
                                 return (
                                 <tr key={row.id}>
                                     <td>{row.ad_account_display}</td>
-                                    <td>{row.name}</td>
-                                    <td>{row.ad_name}</td>
+                                    <td>
+                                        <div>{row.name}</div>
+                                        {renderStatusBadge(campaignStatusById[String(row.campaign_id)])}
+                                    </td>
+                                    <td>
+                                        <div>{row.ad_name}</div>
+                                        {renderStatusBadge(adStatusById[String(row.ad_id)])}
+                                    </td>
                                     <td className={getBgClass(row.spend, 'spend')}>
                                         {formatINR(row.spend)}
                                     </td>
@@ -1249,6 +1579,8 @@ export default function BestPerformingAd() {
                                             {conversionsLoading ? '…' : formatNum(effectiveConversions)}
                                         </button>
                                     </td>
+                                    <td>{conversionsLoading ? '…' : formatNum(onlineConversions)}</td>
+                                    <td>{conversionsLoading ? '…' : formatNum(offlineConversions)}</td>
                                     <td className={getBgClass(effectiveConversionRate, 'conversionRate')}>
                                         {formatPerc(effectiveConversionRate)}
                                     </td>
@@ -1259,7 +1591,9 @@ export default function BestPerformingAd() {
                                     <td>{formatINR(row.cpm)}</td>
                                     <td>{row.hookRate != null ? formatPerc(row.hookRate) : '—'}</td>
                                     <td>{row.holdRate != null ? formatPerc(row.holdRate) : '—'}</td>
-                                    <td>{formatROAS(effectiveRoas)}</td>
+                                    <td>{formatROAS(totalRoas)}</td>
+                                    <td>{formatROAS(onlineRoas)}</td>
+                                    <td>{formatROAS(offlineRoas)}</td>
                                 </tr>
                                 );
                             })
@@ -1268,9 +1602,9 @@ export default function BestPerformingAd() {
                 </table>
                 </div>
                 <div className="d-flex justify-content-end mt-3 text-muted small">
-                    {campaignDataForTable.length > 0 ? (
+                    {sortedCampaignData.length > 0 ? (
                         <>
-                            1 - {campaignDataForTable.length} campaigns · Sorted by ROAS (descending)
+                            1 - {sortedCampaignData.length} campaigns · Sorted by {SORT_COLUMN_LABELS[sortConfig.key] || 'Total ROAS'} ({sortConfig.direction === 'asc' ? 'ascending' : 'descending'})
                             <i className="fas fa-chevron-left ms-3 me-2"></i> <i className="fas fa-chevron-right"></i>
                         </>
                     ) : null}
@@ -1303,7 +1637,14 @@ export default function BestPerformingAd() {
                         )}
                         {!drillDown.loading && !drillDown.error && drillDown.leads.length > 0 && (
                             <>
-                                <div className="dd-count-badge">{drillDown.leads.length} matched lead{drillDown.leads.length !== 1 ? 's' : ''}</div>
+                                <div className="dd-count-badge">
+                                    {drillDown.leads.length} matched lead{drillDown.leads.length !== 1 ? 's' : ''}
+                                    {(() => {
+                                        const online = drillDown.leads.filter((l) => /online/i.test(l.conversionMode || '')).length;
+                                        const offline = drillDown.leads.length - online;
+                                        return <span style={{ marginLeft: 8, fontWeight: 500 }}>· Online {online} · Offline {offline}</span>;
+                                    })()}
+                                </div>
                                 <div className="dd-table-wrap">
                                     <table className="dd-table">
                                         <thead>

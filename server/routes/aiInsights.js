@@ -13,9 +13,15 @@ const router = express.Router();
 // current API key, and gemini-1.5-flash is retired (404). gemini-2.5-flash has
 // working free-tier quota, so it is the default.
 const GEMINI_MODEL = (process.env.GEMINI_MODEL || 'gemini-2.5-flash').trim();
+// When the primary model is overloaded ("high demand" / 503), fall back to these
+// in order. Override with GEMINI_FALLBACK_MODELS (comma-separated).
+const GEMINI_FALLBACK_MODELS = (process.env.GEMINI_FALLBACK_MODELS || 'gemini-flash-latest,gemini-2.0-flash')
+  .split(',').map((s) => s.trim()).filter(Boolean);
 
-/** Call Google Gemini REST API via axios (no SDK needed). */
-async function callGemini(prompt, { system = '', temperature = 0.6, maxTokens = 8192 } = {}) {
+const _sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** One Gemini REST call for a specific model. */
+async function callGeminiModel(model, prompt, { system = '', temperature = 0.6, maxTokens = 8192 } = {}) {
   const key = process.env.GOOGLE_GEMINI_API_KEY;
   const body = {
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -24,13 +30,48 @@ async function callGemini(prompt, { system = '', temperature = 0.6, maxTokens = 
   if (system) body.systemInstruction = { parts: [{ text: system }] };
 
   const { data } = await axios.post(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
     body,
     { timeout: 30000 }
   );
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error('Gemini returned no content');
   return text;
+}
+
+/**
+ * Call Gemini with resilience to TRANSIENT overload ("This model is currently
+ * experiencing high demand" → HTTP 503/UNAVAILABLE): retry the primary model a few
+ * times with backoff, then fall back to alternate models. A model whose free tier
+ * is exhausted ("limit: 0") is skipped immediately. Genuine non-transient errors
+ * (bad request, auth) fail fast.
+ */
+async function callGemini(prompt, opts = {}) {
+  const models = [GEMINI_MODEL, ...GEMINI_FALLBACK_MODELS.filter((m) => m !== GEMINI_MODEL)];
+  let lastErr;
+  for (const model of models) {
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await callGeminiModel(model, prompt, opts);
+      } catch (err) {
+        lastErr = err;
+        const status = err.response?.status;
+        const msg = err.response?.data?.error?.message || err.message || '';
+        const isQuotaZero = status === 429 && /limit:\s*0/i.test(msg);            // permanent for this model
+        const isOverload = status === 503 || /overloaded|high demand|unavailable|temporarily/i.test(msg);
+        const isRateLimit = status === 429 && !isQuotaZero;
+        if (isQuotaZero) break;                                                   // → next fallback model
+        if ((isOverload || isRateLimit) && attempt < maxAttempts) {
+          await _sleep(700 * attempt);                                            // 0.7s, then 1.4s
+          continue;
+        }
+        if (isOverload || isRateLimit) break;                                     // retries exhausted → next model
+        throw err;                                                               // non-transient → fail fast
+      }
+    }
+  }
+  throw lastErr;
 }
 
 /** Parse Gemini/axios errors into a clean { status, message, errorCode } object. */
@@ -224,6 +265,14 @@ router.post('/insights', async (req, res) => {
   } catch (err) {
     const { status, message, errorCode } = parseGeminiError(err);
     console.error('[AI Insights] Gemini error:', message);
+    // Model overloaded / transient error: if we have a previously-computed analysis
+    // for this exact query (even if its TTL expired), serve it so the user still sees
+    // data instead of an error banner.
+    const staleEntry = aiInsightsCache.get(cacheKey);
+    if (staleEntry && staleEntry.data) {
+      res.setHeader('X-AI-Insights-Cache', 'stale');
+      return res.json({ ...staleEntry.data, _stale: true });
+    }
     const payload = { success: false, error: errorCode || 'ai_error', details: message };
     if (status === 429) payload.retryAfterSeconds = 60;
     return res.status(status).json(payload);

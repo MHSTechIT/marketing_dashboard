@@ -1319,6 +1319,7 @@ export default function AdsDashboardBootstrap() {
   const [filteredLeadsForms, setFilteredLeadsForms] = useState([]);
   const [filteredLeadsFormsLoading, setFilteredLeadsFormsLoading] = useState(false);
   const [formDropdownOpen, setFormDropdownOpen] = useState(false);
+  const [formSearchQuery, setFormSearchQuery] = useState('');
   const formDropdownRef = React.useRef(null);
   const loadIdRef = useRef(0);
   const [filteredLeadsTimeRange, setFilteredLeadsTimeRange] = useState(() => {
@@ -5854,13 +5855,34 @@ export default function AdsDashboardBootstrap() {
                       {formDropdownOpen && (
                         <div
                           style={{ position: 'fixed', inset: 0, zIndex: 1049 }}
-                          onClick={() => setFormDropdownOpen(false)}
+                          onClick={() => { setFormDropdownOpen(false); setFormSearchQuery(''); }}
                         />
                       )}
                       <div style={{ position: 'relative', zIndex: 1050 }}>
+                        {/* Search box — filter forms by name as you type */}
+                        <div style={{
+                          position: 'sticky', top: 0, zIndex: 1052,
+                          padding: '8px 10px', backgroundColor: 'var(--card, #ffffff)',
+                          borderBottom: '1px solid var(--border-color, #e2e8f0)',
+                        }}>
+                          <input
+                            type="text"
+                            autoFocus
+                            value={formSearchQuery}
+                            onChange={(e) => setFormSearchQuery(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder="🔍 Search form..."
+                            style={{
+                              width: '100%', boxSizing: 'border-box',
+                              padding: '7px 10px', fontSize: '0.78rem',
+                              border: '1px solid var(--border-color, #cbd5e1)', borderRadius: '6px',
+                              outline: 'none', backgroundColor: 'var(--bg, #ffffff)', color: 'var(--text, #1e293b)',
+                            }}
+                          />
+                        </div>
                         {/* "All Forms" option */}
                         <div
-                          onClick={() => { setFilteredLeadsForm(null); setFormDropdownOpen(false); }}
+                          onClick={() => { setFilteredLeadsForm(null); setFormDropdownOpen(false); setFormSearchQuery(''); }}
                           style={{
                             padding: '7px 12px', cursor: 'pointer', fontSize: '0.8rem',
                             display: 'flex', alignItems: 'center', gap: '8px',
@@ -5884,7 +5906,10 @@ export default function AdsDashboardBootstrap() {
                           <span title="Meta has leads not yet synced — run a backfill">⚠️ Sync issue</span>
                           <span style={{ color: '#94a3b8' }}>(count = synced/Meta)</span>
                         </div>
-                        {filteredLeadsForms.map((form) => {
+                        {filteredLeadsForms.filter((form) => {
+                          const q = formSearchQuery.trim().toLowerCase();
+                          return !q || String(form.name || '').toLowerCase().includes(q);
+                        }).map((form) => {
                           const isActive = form.active != null ? !!form.active : String(form.status || '').toUpperCase() === 'ACTIVE';
                           const isSelected = filteredLeadsForm === form.id;
                           const metaCount = form.leads_count != null ? Number(form.leads_count) : null;
@@ -5907,7 +5932,7 @@ export default function AdsDashboardBootstrap() {
                             <div
                               key={form.id}
                               title={tip}
-                              onClick={() => { setFilteredLeadsForm(form.id); setFormDropdownOpen(false); }}
+                              onClick={() => { setFilteredLeadsForm(form.id); setFormDropdownOpen(false); setFormSearchQuery(''); }}
                               style={{
                                 padding: '7px 12px', cursor: 'pointer', fontSize: '0.8rem',
                                 display: 'flex', alignItems: 'center', gap: '8px',
@@ -5952,6 +5977,13 @@ export default function AdsDashboardBootstrap() {
                             <span style={{ color: '#94a3b8' }}>
                               This page's Meta access may need reconnecting, or it has no synced leads yet.
                             </span>
+                          </div>
+                        )}
+                        {/* Search returned no matches (but forms exist) */}
+                        {filteredLeadsForms.length > 0 && formSearchQuery.trim() &&
+                          filteredLeadsForms.filter((form) => String(form.name || '').toLowerCase().includes(formSearchQuery.trim().toLowerCase())).length === 0 && (
+                          <div style={{ padding: '12px', fontSize: '0.75rem', color: '#64748b', textAlign: 'center' }}>
+                            No forms match "{formSearchQuery}".
                           </div>
                         )}
                       </div>

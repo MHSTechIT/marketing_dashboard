@@ -509,6 +509,53 @@ router.get("/campaigns", optionalAuthMiddleware, async (req, res) => {
 });
 
 // ---------------------------------------------------------------------
+// STATUSES — lightweight effective_status lookup for the Best Performing Ad
+// "Campaign performance" table. Reads ONLY the cached meta_campaigns / meta_ads
+// DB tables (no live Meta calls) and returns id→status maps. Isolated endpoint:
+// it does NOT modify the shared /insights response, so existing dashboards and
+// data accuracy are unaffected.
+//   POST /api/meta/statuses
+//   Body: { ad_account_ids: string[], campaign_ids?: string[] }
+//   → { campaignStatus: { [campaign_id]: status }, adStatus: { [ad_id]: status } }
+// ---------------------------------------------------------------------
+router.post("/statuses", optionalAuthMiddleware, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const accountIds = Array.isArray(body.ad_account_ids)
+      ? body.ad_account_ids.map((id) => String(id).replace(/^act_/, '')).filter(Boolean)
+      : [];
+    const campaignIds = Array.isArray(body.campaign_ids)
+      ? body.campaign_ids.map(String).filter(Boolean)
+      : [];
+    const adIds = Array.isArray(body.ad_ids)
+      ? body.ad_ids.map(String).filter(Boolean)
+      : [];
+    if (accountIds.length === 0) {
+      return res.json({ campaignStatus: {}, adStatus: {} });
+    }
+    const [campaigns, ads] = await Promise.all([
+      metaCampaignsRepository.list(accountIds).catch(() => []),
+      // Prefer exact ad_ids (most complete); fall back to campaign_ids.
+      metaAdsRepository.list(accountIds, { ad_ids: adIds, campaign_ids: campaignIds }).catch(() => []),
+    ]);
+    const campaignStatus = {};
+    for (const c of campaigns || []) {
+      const cid = String(c.campaign_id || '');
+      if (cid) campaignStatus[cid] = c.effective_status || c.status || '';
+    }
+    const adStatus = {};
+    for (const a of ads || []) {
+      const aid = String(a.ad_id || '');
+      if (aid) adStatus[aid] = a.effective_status || a.status || '';
+    }
+    res.json({ campaignStatus, adStatus });
+  } catch (err) {
+    console.error("Meta statuses error:", err.message);
+    res.json({ campaignStatus: {}, adStatus: {} });
+  }
+});
+
+// ---------------------------------------------------------------------
 // 2) INSIGHTS API — reads from database (and optionally live Meta via insightsService).
 //    GET /api/meta/insights
 //    Query: from, to, ad_account_id, time_increment, is_all_campaigns, is_all_ads, campaign_id, ad_id.

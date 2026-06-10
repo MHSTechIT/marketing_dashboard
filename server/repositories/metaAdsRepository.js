@@ -48,10 +48,18 @@ async function list(adAccountIds, opts = {}) {
     .from('meta_ads')
     .select('ad_account_id, ad_id, campaign_id, name, status, effective_status')
     .in('ad_account_id', valid);
+  // Filter by explicit ad_ids when given (most precise — matches the exact ads a
+  // caller needs status for, regardless of campaign linkage). Otherwise optionally
+  // narrow by campaign_ids.
+  const adIds = opts.ad_ids && Array.isArray(opts.ad_ids)
+    ? opts.ad_ids.map(String).filter(Boolean)
+    : [];
   const campaignIds = opts.campaign_ids && Array.isArray(opts.campaign_ids)
     ? opts.campaign_ids.map(String).filter(Boolean)
     : [];
-  if (campaignIds.length > 0) {
+  if (adIds.length > 0) {
+    q = q.in('ad_id', adIds);
+  } else if (campaignIds.length > 0) {
     q = q.in('campaign_id', campaignIds);
   }
   q = q.order('name');

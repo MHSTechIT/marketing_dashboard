@@ -23,7 +23,7 @@ export default function Layout({ children }) {
   };
 
   // Check if current route is a settings route
-  const isSettingsRoute = location.pathname === '/team-management';
+  const isSettingsRoute = location.pathname === '/team-management' || location.pathname === '/page-visit-tracking';
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -207,6 +207,19 @@ export default function Layout({ children }) {
                   >
                     <span className="icon-wrapper me-3">👥</span>
                     <span>Team Management</span>
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink
+                    to="/page-visit-tracking"
+                    className="nav-link sidebar-link submenu-link d-flex align-items-center"
+                    onClick={() => {
+                      setOpenSettingsMenu(false);
+                      if (window.innerWidth < 992) setSidebarOpen(false);
+                    }}
+                  >
+                    <span className="icon-wrapper me-3">📊</span>
+                    <span>Page Visit Tracking</span>
                   </NavLink>
                 </li>
               </ul>
