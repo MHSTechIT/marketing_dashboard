@@ -1,5 +1,6 @@
 // server/repositories/leadsRepository.js
 const { supabase } = require('../supabase');
+const { istDateChar } = require('../utils/istDate');
 
 /** Cached: which physical Leads table/column naming PostgREST exposes. */
 let _leadsDbShape = null;
@@ -149,18 +150,13 @@ async function saveLeads(leads) {
         
         // Validate: Skip conversion if timestamp already has timezone offset (+05:30)
         const hasOffset = hasTimezoneOffset(createdTime);
-        
-        // Extract DateChar without timezone conversion if timezone offset is present
-        let dateChar = lead.DateChar || lead.Date || null;
-        if (!dateChar && createdTime) {
-          if (hasOffset) {
-            // Extract date directly from string (preserves timezone)
-            dateChar = createdTime.split('T')[0];
-          } else {
-            // Fallback for timestamps without timezone
-            dateChar = new Date(createdTime).toISOString().split('T')[0];
-          }
-        }
+
+        // date_char = IST calendar date of the lead, derived canonically from the
+        // instant via istDateChar (handles offset, `Z`, or naive inputs uniformly).
+        // Recompute from createdTime so a stale/UTC DateChar from any caller can't
+        // leak in; fall back to a provided value only if createdTime is missing.
+        let dateChar = createdTime ? (istDateChar(createdTime) || null) : null;
+        if (!dateChar) dateChar = lead.DateChar || lead.Date || null;
         
         // Store timestamp exactly as received if it has timezone offset, otherwise convert to ISO
         let createdTimeValue = null;
@@ -391,8 +387,15 @@ async function fetchLeadsRawForShape(shape, campaignIdList, adIdList, formIdList
   let data = [];
 
   if (dateFrom && dateTo) {
-    const dateFromISO = new Date(`${dateFrom}T00:00:00`).toISOString();
-    const dateToISO = new Date(`${dateTo}T23:59:59.999`).toISOString();
+    // Anchor the day window to IST (the dashboard's display timezone) regardless of
+    // the server's local timezone. A bare `${dateFrom}T00:00:00` is parsed in the
+    // SERVER's local TZ, so on a UTC server (e.g. production EC2) it becomes UTC
+    // midnight and MISSES leads created in the previous UTC evening that belong to
+    // this IST day (e.g. a 00:14 IST lead is stored as 18:44Z the previous day).
+    // IST-anchoring makes the created_time/time_utc queries fetch the full IST day;
+    // the IST-aware post-filter below then trims to the exact range.
+    const dateFromISO = new Date(`${dateFrom}T00:00:00+05:30`).toISOString();
+    const dateToISO = new Date(`${dateTo}T23:59:59.999+05:30`).toISOString();
     const qChar = buildFiltered()
       .gte(C.date, dateFrom)
       .lte(C.date, dateTo)
@@ -620,8 +623,10 @@ async function getDuplicateRateByCampaign(dateFrom, dateTo) {
   const tbl = leadsTableName(shape);
   const C = leadsCol(shape);
 
-  const dateFromISO = dateFrom ? new Date(dateFrom + 'T00:00:00').toISOString() : null;
-  const dateToISO = dateTo ? new Date(dateTo + 'T23:59:59').toISOString() : null;
+  // IST-anchored window (see fetchLeadsRawForShape) so duplicate-rate analytics
+  // count the same IST day the dashboard shows, independent of server timezone.
+  const dateFromISO = dateFrom ? new Date(dateFrom + 'T00:00:00+05:30').toISOString() : null;
+  const dateToISO = dateTo ? new Date(dateTo + 'T23:59:59.999+05:30').toISOString() : null;
 
   let query = supabase.from(tbl).select(`campaign_id, ${C.campaign}, ${C.phone}`);
 

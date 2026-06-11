@@ -3,6 +3,7 @@ const axios = require('axios');
 const { saveLeads } = require('../repositories/leadsRepository');
 const { parseFieldData, findFirstValueByKeyPattern } = require('../constants/leadFieldLabels');
 const { getJobState, setJobState } = require('../repositories/jobStateRepository');
+const { istDateChar } = require('../utils/istDate');
 
 const META_API_VERSION = "v24.0"; // Using v24.0 as specified in user's API
 
@@ -603,18 +604,12 @@ async function fetchLeadsFromMeta(pageId, startDate, endDate) {
 
           // Store raw timestamp from Meta API exactly as received (preserves timezone offset like +05:30)
           const rawCreatedTime = lead.created_time || null;
-          
-          // Validate: Skip conversion if timestamp already has timezone offset (+05:30)
-          const hasOffset = hasTimezoneOffset(rawCreatedTime);
-          
-          // Extract date without timezone conversion
-          // If timestamp has timezone offset, extract date directly from string
-          // Otherwise, use standard date parsing
-          const dateChar = rawCreatedTime 
-            ? (hasOffset 
-                ? rawCreatedTime.split('T')[0]  // Direct extraction preserves timezone
-                : new Date(rawCreatedTime).toISOString().split('T')[0])  // Fallback for UTC-only
-            : null;
+
+          // date_char MUST be the IST calendar date (the dashboard's display TZ),
+          // derived from the absolute instant regardless of the input format. The old
+          // split('T')[0] / toISOString() logic stored the UTC day for `...Z` inputs,
+          // which filed 00:00–05:29 IST leads under the previous day. See utils/istDate.js.
+          const dateChar = rawCreatedTime ? (istDateChar(rawCreatedTime) || null) : null;
 
           const mappedLead = {
             lead_id: lead.id,

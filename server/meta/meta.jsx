@@ -8,6 +8,7 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const router = express.Router();
 const { authMiddleware, optionalAuthMiddleware } = require("../auth");
 const { saveLeads, getLeadsByCampaignAndAd } = require("../repositories/leadsRepository");
+const { istDateChar } = require("../utils/istDate");
 const metaCampaignsRepository = require("../repositories/metaCampaignsRepository");
 const metaAdsRepository = require("../repositories/metaAdsRepository");
 const { supabase: leadsSupabase } = require("../supabase");
@@ -2709,7 +2710,8 @@ async function getFormStatsByForm(pageId) {
         .from('leads')
         .select('form_id, form_name')
         .eq('page_id', pageId)
-        .range(from, from + PAGE - 1);
+        .order('id', { ascending: true }) // stable sort — without it, .range() pagination
+        .range(from, from + PAGE - 1);     // can skip rows and undercount a form to 0 (false sync_issue)
       if (error || !data || data.length === 0) break;
       for (const r of data) {
         if (!r.form_id) continue;
@@ -5750,10 +5752,10 @@ router.get("/leads", optionalAuthMiddleware, async (req, res) => {
             Name: leadName,
             Phone: phone,
             Email: fieldData.email || 'N/A',
-            Date: lead.created_time ? lead.created_time.split('T')[0] : '',
+            Date: istDateChar(lead.created_time),
             Time: lead.created_time || '',
             TimeUtc: lead.created_time || '',
-            DateChar: lead.created_time ? lead.created_time.split('T')[0] : '',
+            DateChar: istDateChar(lead.created_time),
             Street: street,
             City: city,
             SugarPoll: sugarPoll,
@@ -6076,10 +6078,10 @@ router.get("/leads-with-context", optionalAuthMiddleware, async (req, res) => {
             SugarPoll: sugarPoll,
             raw_field_data: lead.field_data || [],
             // Legacy date fields for frontend compatibility
-            Date: lead.created_time ? lead.created_time.split('T')[0] : '',
+            Date: istDateChar(lead.created_time),
             Time: lead.created_time || '',
             TimeUtc: lead.created_time || '',
-            DateChar: lead.created_time ? lead.created_time.split('T')[0] : '',
+            DateChar: istDateChar(lead.created_time),
             // Capitalized field names for backward compatibility
             Name: leadName,
             Phone: phone,
