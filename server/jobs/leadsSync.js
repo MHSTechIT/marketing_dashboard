@@ -804,9 +804,72 @@ function startLeadsSyncScheduler() {
   return intervalId;
 }
 
+/**
+ * Reconciliation backfill — the PERMANENT safety net against incremental-sync gaps.
+ *
+ * The 15-min incremental sync advances a single global cursor that only moves
+ * forward. If a form is briefly absent from the form list, errors, or a run is
+ * skipped while the cursor still advances (or a lead arrives later than the 10-min
+ * overlap), that window is stepped over and never re-checked — leads are silently
+ * lost (e.g. the June-8 00:05–09:08 IST gap on form 4274516802858453).
+ *
+ * This re-fetches a TRAILING WINDOW (default 3 days) for EVERY page, independent of
+ * the cursor, and upserts via saveLeads (idempotent by lead_id). Anything the
+ * incremental sync missed is healed on the next reconcile pass. Re-running it never
+ * creates duplicates, so it is safe to run as often as desired.
+ */
+async function reconcileRecentLeads(days) {
+  const reconcileDays = Math.max(1, parseInt(days != null ? days : process.env.LEADS_RECONCILE_DAYS, 10) || 3);
+  const pageIds = getPageIds();
+  if (pageIds.length === 0) {
+    console.warn('[LeadsReconcile] No page IDs configured — skipping.');
+    return { ok: false, reason: 'no_page_ids', fetched: 0 };
+  }
+  const end = new Date();
+  const start = new Date(end.getTime() - reconcileDays * 24 * 60 * 60 * 1000);
+  console.log(`[LeadsReconcile] Trailing-window reconcile ${start.toISOString()} → ${end.toISOString()} (${reconcileDays}d, ${pageIds.length} page(s))`);
+  let fetched = 0;
+  for (const pageId of pageIds) {
+    try {
+      const leads = await fetchLeadsFromMeta(pageId, start, end);
+      if (leads.length) await saveLeads(leads);
+      fetched += leads.length;
+    } catch (e) {
+      console.error(`[LeadsReconcile] page ${pageId} error:`, e.response?.data?.error?.message || e.message);
+    }
+  }
+  console.log(`[LeadsReconcile] Done — ${fetched} lead(s) upserted across ${reconcileDays}d.`);
+  return { ok: true, fetched, days: reconcileDays };
+}
+
+/**
+ * Start the reconciliation scheduler. Runs a few minutes after boot (so it doesn't
+ * collide with the initial incremental sync), then every LEADS_RECONCILE_INTERVAL_MIN
+ * minutes (default 180 = every 3 hours). This bounds how long any missed lead can
+ * stay missing to roughly one reconcile interval.
+ */
+function startLeadsReconcileScheduler() {
+  const pageIds = getPageIds();
+  if (pageIds.length === 0) {
+    console.warn('[LeadsReconcile] ⚠️  No page IDs configured — reconcile scheduler not started.');
+    return null;
+  }
+  const intervalMin = Math.max(30, parseInt(process.env.LEADS_RECONCILE_INTERVAL_MIN, 10) || 180);
+  console.log(`[LeadsReconcile] Scheduler started — reconcile every ${intervalMin} min (trailing ${parseInt(process.env.LEADS_RECONCILE_DAYS, 10) || 3}d).`);
+  setTimeout(() => {
+    reconcileRecentLeads().catch(err => console.error('[LeadsReconcile] Error in initial reconcile:', err.message || err));
+  }, 5 * 60 * 1000);
+  const intervalId = setInterval(() => {
+    reconcileRecentLeads().catch(err => console.error('[LeadsReconcile] Error in scheduled reconcile:', err.message || err));
+  }, intervalMin * 60 * 1000);
+  return intervalId;
+}
+
 module.exports = {
   syncLeads,
   startLeadsSyncScheduler,
+  reconcileRecentLeads,
+  startLeadsReconcileScheduler,
   fetchLeadsFromMeta,
   getPageAccessToken
 };

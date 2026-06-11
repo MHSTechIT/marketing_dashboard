@@ -1257,8 +1257,9 @@ app.get('/api/google-sheets/content-marketing-revenue', async (req, res) => {
 });
 
 // Initialize leads sync scheduler
-const { startLeadsSyncScheduler } = require('./jobs/leadsSync');
+const { startLeadsSyncScheduler, startLeadsReconcileScheduler } = require('./jobs/leadsSync');
 let leadsSyncIntervalId = null;
+let leadsReconcileIntervalId = null;
 
 // Initialize insights sync scheduler (hourly, last 1.5h → DB)
 const { startInsightsSyncScheduler } = require('./jobs/insightsSync');
@@ -1293,6 +1294,8 @@ function startSchedulers() {
   _schedulersStarted = true;
   console.log('[Schedulers] Starting background lead-sync schedulers…');
   try { leadsSyncIntervalId = startLeadsSyncScheduler(); } catch (e) { console.error('Error starting leads sync scheduler:', e.message); }
+  // Permanent safety net: trailing-window reconcile heals any leads the incremental sync missed.
+  try { leadsReconcileIntervalId = startLeadsReconcileScheduler(); } catch (e) { console.error('Error starting leads reconcile scheduler:', e.message); }
   try { insightsSyncIntervalId = startInsightsSyncScheduler(); } catch (e) { console.error('Error starting insights sync scheduler:', e.message); }
   try { tokenRefreshIntervalId = startTokenRefreshScheduler(); } catch (e) { console.error('Error starting token refresh scheduler:', e.message); }
   try { storySnapshotsIntervalId = startStorySnapshotsScheduler(); } catch (e) { console.error('Error starting story snapshots scheduler:', e.message); }
