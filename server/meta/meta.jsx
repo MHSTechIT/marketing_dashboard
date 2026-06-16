@@ -3575,12 +3575,13 @@ router.get("/pages/:pageId/insights", optionalAuthMiddleware, async (req, res) =
       const insightsData = await fetchOneMetricSet(metric);
       processedData = processInsights(insightsData.length ? insightsData : [], periodLabel);
     } else {
-      const [reachViewsData, followsData, interactionsData, consumptionsData, interactionsTotalData] = await Promise.all([
+      const [reachViewsData, followsData, interactionsData, consumptionsData, engTotalData, engagedUsersTotalData] = await Promise.all([
         fetchOneMetricSet("page_media_view,page_impressions_unique"),
         fetchOneMetricSet("page_daily_follows,page_daily_unfollows_unique,page_follows"),
         fetchOneMetricSet("page_post_engagements"),
         fetchOneMetricSet("page_consumptions"),
         fetchTotalValue("page_post_engagements"),
+        fetchTotalValue("page_engaged_users"),
       ]);
       processedData = processInsights([], periodLabel);
       if (reachViewsData.length) {
@@ -3595,17 +3596,27 @@ router.get("/pages/:pageId/insights", optionalAuthMiddleware, async (req, res) =
       if (consumptionsData.length) {
         processedData = mergeProcessedData(processedData, processInsights(consumptionsData, periodLabel));
       }
-      // Override total_interactions with the period-level total_value (matches Meta Insights "Content interactions").
-      // The daily sum from page_post_engagements overcounts because it sums all engagement each day across all posts.
-      if (interactionsTotalData.length) {
-        const engMetric = interactionsTotalData.find(m => m.name === "page_post_engagements");
-        if (engMetric) {
-          const tv = engMetric.total_value;
-          const tvNum = tv != null ? (typeof tv === "object" ? Number(tv.value) : Number(tv)) : NaN;
-          if (!isNaN(tvNum) && tvNum > 0) {
-            processedData.total_interactions = tvNum;
-          }
-        }
+      // Debug log to identify which total_value response matches Meta Insights 107.2K
+      const extractTV = (arr, metricName) => {
+        const m = (arr || []).find(x => x.name === metricName);
+        if (!m) return null;
+        const tv = m.total_value;
+        return tv != null ? (typeof tv === "object" ? Number(tv.value) : Number(tv)) : null;
+      };
+      const engPostTV = extractTV(engTotalData, "page_post_engagements");
+      const engUsersTV = extractTV(engagedUsersTotalData, "page_engaged_users");
+      console.log("[FB Interactions Debug] page_post_engagements total_value:", engPostTV, "| page_engaged_users total_value:", engUsersTV, "| daily sum:", processedData.total_interactions);
+
+      // Priority: page_engaged_users total_value → page_post_engagements total_value → daily sum
+      // page_engaged_users (unique people who engaged) matches Meta Insights "Content interactions"
+      if (engUsersTV != null && engUsersTV > 0) {
+        processedData.total_interactions = engUsersTV;
+        console.log("[FB Interactions Debug] Using page_engaged_users total_value:", engUsersTV);
+      } else if (engPostTV != null && engPostTV > 0 && engPostTV !== processedData.total_interactions) {
+        processedData.total_interactions = engPostTV;
+        console.log("[FB Interactions Debug] Using page_post_engagements total_value:", engPostTV);
+      } else {
+        console.log("[FB Interactions Debug] Falling back to daily sum:", processedData.total_interactions);
       }
       if ((processedData.total_follows === 0 && processedData.total_unfollows === 0) || !followsData.length) {
         const pageFollowsDaily = await fetchOneMetricSet("page_follows");

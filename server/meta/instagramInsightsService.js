@@ -419,14 +419,13 @@ async function fetchInsightsRequest(igAccountId, since, until, accessToken, metr
 
 /**
  * Fetch insights for a single IG Business Account.
- * Uses four requests:
- * - Follows: metric=follower_count&period=day (daily values needed for subscriber chart)
- * - Reach total: metric=reach&metric_type=total_value&period=day (deduplicated period total, matches Meta Insights UI)
- * - Views/Interactions totals: metric=views,total_interactions&metric_type=total_value&period=day (for summary cards)
- * - Views/Interactions daily: metric=views,total_interactions&period=day (for chart time-series)
+ * Uses three parallel requests:
+ * - reach + follower_count daily (original working request — fallback reach + subscriber chart data)
+ * - reach with metric_type=total_value (deduplicated period total, overrides daily sum when available)
+ * - views + total_interactions with metric_type=total_value (period totals for summary cards)
  *
- * reach is fetched separately with metric_type=total_value so Meta returns the deduplicated unique-people count
- * (same number shown in Meta Insights). Summing daily reach values overcounts by ~2-3x (same user counted per day).
+ * The daily views,total_interactions request is intentionally omitted: Meta API now rejects it
+ * with error #100 requiring metric_type=total_value. The total_value request provides correct card values.
  *
  * @param {string} igAccountId
  * @param {string} since - YYYY-MM-DD (converted to Unix for Meta API)
@@ -435,19 +434,19 @@ async function fetchInsightsRequest(igAccountId, since, until, accessToken, metr
  * @returns {Promise<{ accountId, reached, follows, views, interactions, date } | null>}
  */
 async function fetchSingleAccountInsights(igAccountId, since, until, accessToken) {
-  const [followerData, reachTotalData, viewsDataTotal, viewsDataDaily] = await Promise.all([
-    fetchInsightsRequest(igAccountId, since, until, accessToken, "follower_count"),
+  const [reachFollowerData, reachTotalData, viewsDataTotal] = await Promise.all([
+    fetchInsightsRequest(igAccountId, since, until, accessToken, "reach,follower_count"),
     fetchInsightsRequest(igAccountId, since, until, accessToken, "reach", "total_value"),
     fetchInsightsRequest(igAccountId, since, until, accessToken, "views,total_interactions", "total_value"),
-    fetchInsightsRequest(igAccountId, since, until, accessToken, "views,total_interactions"),
   ]);
 
   const mergedData = [
-    ...(Array.isArray(followerData) ? followerData : []),
-    ...(Array.isArray(reachTotalData) ? reachTotalData : []),
-    // daily first so total_value (below) processes last and wins in the switch
-    ...(Array.isArray(viewsDataDaily) ? viewsDataDaily : []),
+    // reach,follower_count daily first — sets initial reach (daily sum) + follower chart data
+    ...(Array.isArray(reachFollowerData) ? reachFollowerData : []),
+    // views/interactions total_value — correct period totals for cards
     ...(Array.isArray(viewsDataTotal) ? viewsDataTotal : []),
+    // reach total_value LAST — overrides daily-sum reach with deduplicated period total
+    ...(Array.isArray(reachTotalData) ? reachTotalData : []),
   ];
 
   if (mergedData.length === 0) {

@@ -11,12 +11,24 @@ function getClient() {
 
 async function callClaude(prompt) {
   const client = getClient();
-  const msg = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 1024,
-    messages: [{ role: 'user', content: prompt }],
-  });
-  return msg.content[0]?.text || '';
+  try {
+    const msg = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1024,
+      messages: [{ role: 'user', content: prompt }],
+    });
+    return msg.content[0]?.text || '';
+  } catch (e) {
+    // Detect billing/credit errors and throw a clean message instead of raw JSON
+    const raw = e.message || '';
+    const isBilling =
+      e.status === 400 &&
+      (raw.includes('credit balance') || raw.includes('billing') || raw.includes('invalid_request_error'));
+    if (isBilling) {
+      throw new Error('AI credits exhausted. Please top up the Anthropic account at console.anthropic.com/settings/billing.');
+    }
+    throw e;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
