@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { ALL_SPECIFIED_ACCOUNT_IDS } from '../constants/projectAdAccounts';
 import './AIInsights.css';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:4000';
@@ -185,23 +186,27 @@ const INSIGHTS_DATE_PRESET_OPTIONS = [
 
 const getDateRangeForPreset = (presetId) => {
     const today = new Date();
+    // Rolling presets end at yesterday (last completed day) so they match the Dashboard's definition.
+    // "Today" is the only preset that explicitly includes the current day.
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
     if (presetId === 'today') {
         return { from: toYMDLocal(today), to: toYMDLocal(today) };
     }
     if (presetId === 'last_7_days') {
-        const start = new Date(today);
+        const start = new Date(yesterday);
         start.setDate(start.getDate() - 6);
-        return { from: toYMDLocal(start), to: toYMDLocal(today) };
+        return { from: toYMDLocal(start), to: toYMDLocal(yesterday) };
     }
     if (presetId === 'last_14_days') {
-        const start = new Date(today);
+        const start = new Date(yesterday);
         start.setDate(start.getDate() - 13);
-        return { from: toYMDLocal(start), to: toYMDLocal(today) };
+        return { from: toYMDLocal(start), to: toYMDLocal(yesterday) };
     }
     if (presetId === 'last_30_days') {
-        const start = new Date(today);
+        const start = new Date(yesterday);
         start.setDate(start.getDate() - 29);
-        return { from: toYMDLocal(start), to: toYMDLocal(today) };
+        return { from: toYMDLocal(start), to: toYMDLocal(yesterday) };
     }
     return null;
 };
@@ -487,8 +492,10 @@ const parseInsightsRows = (rawData) => {
         const aggs = transformActions(d.actions || []);
         const leadCount =
             aggs['lead'] ||
+            aggs['leads'] ||
             aggs['on_facebook_lead'] ||
             aggs['onsite_conversion.lead_grouped'] ||
+            aggs['offsite_conversion.fb_pixel_lead'] ||
             (Object.keys(aggs || {}).filter((k) => String(k).toLowerCase().includes('lead')).reduce((s, k) => s + (Number(aggs[k]) || 0), 0)) ||
             0;
         const spend = num(d.spend);
@@ -521,7 +528,11 @@ const fetchInsightsForAI = async (from, to, forceRefresh = false) => {
         // across many accounts that can timeout and return 500.
         // On explicit refresh, use live=1 to fetch fresh data from Meta.
         const liveParam = forceRefresh ? '&live=1&refresh=1' : '';
-        const baseUrl = `${API_BASE}/api/meta/insights?time_increment=1&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&is_all_campaigns=1&is_all_ads=1`;
+        // Use the same explicit account list as the Dashboard so totals match exactly.
+        const accountParam = ALL_SPECIFIED_ACCOUNT_IDS.length > 0
+            ? `&ad_account_id=${encodeURIComponent(ALL_SPECIFIED_ACCOUNT_IDS.join(','))}`
+            : '';
+        const baseUrl = `${API_BASE}/api/meta/insights?time_increment=1&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${accountParam}&is_all_campaigns=1&is_all_ads=1`;
         const res = await fetch(`${baseUrl}${liveParam}`, { headers });
         if (!res.ok) {
             // DB fetch failed; try once with live as fallback
@@ -582,10 +593,11 @@ const fetchMediaInsightsForAI = async (pageId, opts = {}) => {
         const params = new URLSearchParams();
         params.append('pageIds', pageId);
         params.append('contentType', 'reels');
+        params.append('limit', '25');
         if (opts.from) params.append('from', opts.from);
         if (opts.to) params.append('to', opts.to);
         if (opts.forceRefresh) params.append('refresh', '1');
-        const res = await fetchJsonWithTimeout(`${API_BASE}/api/meta/instagram/media-insights?${params.toString()}`, { headers }, opts.timeoutMs || 30000);
+        const res = await fetchJsonWithTimeout(`${API_BASE}/api/meta/instagram/media-insights?${params.toString()}`, { headers }, opts.timeoutMs || 50000);
         if (!res.ok) return null;
         return await res.json();
     } catch (e) {
@@ -757,7 +769,7 @@ const pickReelTitleFromCaption = (caption, maxLen = 120) => {
     }
     if (!chosen || lineLooksLikeContactFooter(chosen) || lineLooksLikeReelSignature(chosen)) {
         const sorted = [...parts].sort((a, b) => scoreReelTitleLine(b) - scoreReelTitleLine(a));
-        chosen = (sorted[0] || chosen || 'Reel').trim();
+        chosen = (sorted[0] || chosen || '').trim();
     }
     /* Only signature / brand pipe parts left (e.g. Dr… | My Health School) — show together, not “Follow @…”. */
     const noFollow = parts.filter((c) => !lineLooksLikeFollowHandleCta(c));
@@ -768,7 +780,8 @@ const pickReelTitleFromCaption = (caption, maxLen = 120) => {
             chosen = sigJoin.join(' | ').trim();
         }
     }
-    if (!chosen) return 'Reel';
+    // Last resort: if the only extractable text is a contact footer, don't expose phone numbers as a title
+    if (!chosen || lineLooksLikeContactFooter(chosen)) return 'Reel';
     if (chosen.length <= maxLen) return chosen;
     return `${chosen.slice(0, maxLen - 1)}…`;
 };
@@ -793,23 +806,25 @@ const pickReelSubtitleFromCaption = (caption, primaryTitle, maxLen = 140) => {
     return sub;
 };
 
-/** First caption line for snapshot card (long hook + emoji + “Dr… |” on one line), after skipping a leading “Follow @…”. */
+/** First caption line for snapshot card (long hook + emoji + “Dr… |” on one line), after skipping a leading “Follow @…” or contact footer. */
 const pickReelHeadlineLineFromCaption = (caption, maxLen = 200) => {
     if (!caption || typeof caption !== 'string') return '';
     const lines = caption.trim().split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     if (lines.length === 0) return '';
     let body = lines;
     if (lines.length >= 2 && lineLooksLikeFollowHandleCta(lines[0])) body = lines.slice(1);
-    const first = body[0] || lines[0] || '';
+    // Prefer the first non-contact-footer line for the headline
+    const first = body.find((l) => !lineLooksLikeContactFooter(l) && !lineLooksLikeFollowHandleCta(l)) || body[0] || lines[0] || '';
     if (!first) return '';
     return first.length <= maxLen ? first : `${first.slice(0, maxLen - 1)}…`;
 };
 
-/** Sanitize watch time — Meta sometimes returns impossibly high values */
-const capWatchTime = (raw) => Math.min(Number(raw) || 0, 120);
+/** Sanitize watch time — cap at 30 min (1800s); reels longer than that are exceptional but the API occasionally returns garbage values in the thousands */
+const capWatchTime = (raw) => Math.min(Number(raw) || 0, 1800);
 
 const buildReelResult = (top) => {
-    const reach = Number(top.reach) || Number(top.views) || 0;
+    const reach = Number(top.reach) || 0;
+    const views = Number(top.views) || Number(top.video_views) || 0;
     const likes = Number(top.likes) || 0;
     const comments = Number(top.comments) || 0;
     const shares = Number(top.shares) || 0;
@@ -820,7 +835,9 @@ const buildReelResult = (top) => {
     const subtitle = pickReelSubtitleFromCaption(top.caption, name, 140);
     const hookRate = Math.min(Number(top.hook_rate || 0), 100);
     const video_avg_time_watched = capWatchTime(top.video_avg_time_watched);
-    const engagementRatePct = reach > 0 ? Math.round((engagements / reach) * 1000) / 10 : 0;
+    // Use reach as denominator (Meta standard); only fall back to views when reach is truly 0
+    const engDenominator = reach > 0 ? reach : (views > 0 ? views : 0);
+    const engagementRatePct = engDenominator > 0 ? Math.round((engagements / engDenominator) * 1000) / 10 : 0;
     return {
         name,
         headlineLine,
@@ -909,7 +926,8 @@ const pickBestReelForRollingTab = (mediaPayload, endYmd, numDays, widerDays, fin
 };
 
 /**
- * “Today” tab: strict today (± expanded day); then rolling 7d / 14d. Never jump to full batch first (misleading vs ad dates).
+ * “Today” tab: strict today (± expanded day); then rolling 7d / 14d / 30d / 62d / 90d / full batch.
+ * Never leave blank when reels exist in the loaded analysis range.
  */
 const pickBestReelForTodayTab = (mediaPayload, snap) => {
     const strict = pickBestReel(mediaPayload, snap.today);
@@ -927,6 +945,38 @@ const pickBestReelForTodayTab = (mediaPayload, snap) => {
         return {
             ...roll14,
             snapshotFallbackNote: ' No reel posted today — showing top reel published in the last 14 days.',
+            hideReelPublishTime: true
+        };
+    }
+    const roll30 = pickBestReel(mediaPayload, rollingDaysEndingOn(snap.today.to, 30));
+    if (roll30) {
+        return {
+            ...roll30,
+            snapshotFallbackNote: ' No reel posted today — showing top reel published in the last 30 days.',
+            hideReelPublishTime: true
+        };
+    }
+    const roll62 = pickBestReel(mediaPayload, rollingDaysEndingOn(snap.today.to, 62));
+    if (roll62) {
+        return {
+            ...roll62,
+            snapshotFallbackNote: ' No reel posted today — showing top reel within the last ~60 days.',
+            hideReelPublishTime: true
+        };
+    }
+    const roll90 = pickBestReel(mediaPayload, rollingDaysEndingOn(snap.today.to, 90));
+    if (roll90) {
+        return {
+            ...roll90,
+            snapshotFallbackNote: ' No reel posted today — showing top reel within the last ~90 days.',
+            hideReelPublishTime: true
+        };
+    }
+    const any = pickBestReel(mediaPayload, null);
+    if (any) {
+        return {
+            ...any,
+            snapshotFallbackNote: ' No recent reel data — showing all-time best reel in the analysis range.',
             hideReelPublishTime: true
         };
     }
@@ -1205,6 +1255,21 @@ export default function AIInsights() {
     const [qualityScores, setQualityScores] = useState([]);
     const [leadDownloadOpen, setLeadDownloadOpen] = useState(false);
     const leadDownloadRef = useRef(null);
+
+    /* Persisted media payload and insights rows for AI-powered feature handlers */
+    const [mediaPayloadCache, setMediaPayloadCache] = useState(null);
+    const [insightsRowsCache, setInsightsRowsCache] = useState([]);
+
+    /* AI-Powered Features — 6 independent analysis cards */
+    const [aiFeatures, setAiFeatures] = useState({
+        reelAdBridge:      { loading: false, error: null, result: null },
+        contentVelocity:   { loading: false, error: null, result: null },
+        postTimeHeatmap:   { loading: false, error: null, result: null },
+        fatiguePrediction: { loading: false, error: null, result: null },
+        cplWatchtime:      { loading: false, error: null, result: null },
+        budgetRealloc:     { loading: false, error: null, result: null },
+    });
+    const setFeature = (key, patch) => setAiFeatures(prev => ({ ...prev, [key]: { ...prev[key], ...patch } }));
     const [satSort, setSatSort] = useState({ field: 'saturation_index', dir: 'desc' });
     const [fatSort, setFatSort] = useState({ field: 'fatigue_score', dir: 'desc' });
     const [leadSort, setLeadSort] = useState({ field: 'score', dir: 'desc' });
@@ -1294,6 +1359,7 @@ export default function AIInsights() {
                 await sleep(450);
                 if (!isStale()) pages = await fetchPages();
             }
+            if (!isStale() && insightsRows?.length) setInsightsRowsCache(insightsRows);
 
             let mediaPayload = await fetchMediaInsightsForPages(pages, mediaOptsBase);
             if (!isStale() && insightsRows.length > 0 && (!mediaPayload?.media || mediaPayload.media.length === 0)) {
@@ -1305,6 +1371,7 @@ export default function AIInsights() {
                     });
                 }
             }
+            if (!isStale()) setMediaPayloadCache(mediaPayload);
 
             // --- Build rich summary for the user's SELECTED date range (used by Ask AI) ---
             const filteredRows = filterInsightsRowsByPeriod(insightsRows, { from: heroFrom, to: heroTo });
@@ -1523,16 +1590,56 @@ export default function AIInsights() {
         }
     }, [resolvedInsightsRange]);
 
+    /* ── AI-Powered Feature handlers ── */
+    const runAiFeature = useCallback(async (featureKey, endpoint, bodyFn) => {
+        setFeature(featureKey, { loading: true, error: null, result: null });
+        try {
+            const token = getAuthToken();
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            const body = bodyFn();
+            const res = await fetch(`${API_BASE}/api/ai/features/${endpoint}`, { method: 'POST', headers, body: JSON.stringify(body) });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || json.success === false) throw new Error(json.error || `Request failed (${res.status})`);
+            setFeature(featureKey, { loading: false, error: null, result: json });
+        } catch (e) {
+            setFeature(featureKey, { loading: false, error: e.message || 'Analysis failed', result: null });
+        }
+    }, []);
+
+    const getReelsForFeature = useCallback(() => {
+        const media = mediaPayloadCache?.media || [];
+        return media.filter(m => m && (m.product_type === 'REELS' || String(m.permalink || '').includes('/reel')))
+            .slice(0, 40)
+            .map(m => ({
+                id: m.id,
+                headlineLine: m.caption?.split('\n')?.[0]?.slice(0, 60) || 'Reel',
+                views: Number(m.views || m.video_views || 0),
+                reach: Number(m.reach || 0),
+                saves: Number(m.saved || m.saves || 0),
+                shares: Number(m.shares || 0),
+                hook_rate: Number(m.hook_rate || 0),
+                video_avg_time_watched: Number(m.video_avg_time_watched || 0),
+                timestamp: m.timestamp || null,
+            }));
+    }, [mediaPayloadCache]);
+
     const loadLeadScores = useCallback(async () => {
         try {
             const token = getAuthToken();
             const headers = {};
             if (token) headers['Authorization'] = `Bearer ${token}`;
-            const { from, to } = resolvedInsightsRange;
-            const res = await fetch(`${API_BASE}/api/ai/lead-quality/scores?dateFrom=${encodeURIComponent(from)}&dateTo=${encodeURIComponent(to)}&limit=10000`, { headers });
+            const { from } = resolvedInsightsRange;
+            // Always extend dateTo to TODAY so leads scored today are never filtered out
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const res = await fetch(`${API_BASE}/api/ai/lead-quality/scores?dateFrom=${encodeURIComponent(from)}&dateTo=${encodeURIComponent(todayStr)}&limit=10000`, { headers });
             const json = await res.json().catch(() => ({}));
-            if (json.success && Array.isArray(json.data)) setQualityScores(json.data);
-        } catch (e) { /* ignore */ }
+            if (json.success && Array.isArray(json.data)) {
+                setQualityScores(json.data);
+                return json.data;
+            }
+            return [];
+        } catch (e) { return []; }
     }, [resolvedInsightsRange]);
 
     const fetchLeadQuality = useCallback(async () => {
@@ -1577,7 +1684,15 @@ export default function AIInsights() {
             setReelsData(cached.reelsData || defaultReelsData);
             setInsights(Array.isArray(cached.insights) ? cached.insights : []);
             setRecommendations(Array.isArray(cached.recommendations) ? cached.recommendations : []);
-            if (cached.filteredAdsSummary) setFilteredAdsSummary(cached.filteredAdsSummary);
+            if (cached.filteredAdsSummary) {
+                // Only use cached summary when its date range matches the current preset definition.
+                // If the preset window has shifted (e.g. yesterday vs today boundary changed), discard it
+                // so Ask AI never returns a number from a different date window.
+                const currentRange = getDateRangeForPreset(insightsDatePreset);
+                const cr = cached.filteredAdsSummary?.dateRange;
+                const rangeMatches = cr && currentRange && cr.from === currentRange.from && cr.to === currentRange.to;
+                if (rangeMatches) setFilteredAdsSummary(cached.filteredAdsSummary);
+            }
             if (cached.lastAnalysedAt) setLastAnalysedAt(new Date(cached.lastAnalysedAt));
             hasAnalysisRef.current = true;
             setHasAnalysis(true);
@@ -1596,7 +1711,45 @@ export default function AIInsights() {
     }, [insightsDatePreset, customCommitted.from, customCommitted.to]);
 
     useEffect(() => {
-        loadLeadScores();
+        let cancelled = false;
+        const init = async () => {
+            const scores = await loadLeadScores();
+            if (cancelled) return;
+
+            // Auto-score gap: find the most recent lead DATE in stored scores.
+            // Compare date strings (YYYY-MM-DD) so a lead at 23:58 on June 14 still
+            // triggers scoring for June 15 — avoids the <24h ms-threshold miss.
+            const todayStr = new Date().toISOString().slice(0, 10);
+            let latestDateStr = null;
+            for (const r of scores) {
+                const dt = r.date_time ?? r.score_breakdown?.date_time;
+                if (dt) {
+                    const d = String(dt).slice(0, 10);
+                    if (!latestDateStr || d > latestDateStr) latestDateStr = d;
+                }
+            }
+            const needsGapScore = !latestDateStr || latestDateStr < todayStr;
+            if (!needsGapScore) return;
+
+            // Re-score from the latest scored date (catches any late-arriving leads that day)
+            // through today, so the table stays current without manual intervention.
+            const gapFrom = latestDateStr || resolvedInsightsRange.from;
+
+            try {
+                const token = getAuthToken();
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+                const res = await fetch(`${API_BASE}/api/ai/lead-quality`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ dateFrom: gapFrom, dateTo: todayStr }),
+                });
+                if (res.ok && !cancelled) await loadLeadScores();
+            } catch (_) { /* silent — user can still click Run scoring manually */ }
+        };
+        init();
+        return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [loadLeadScores]);
 
     useEffect(() => {
@@ -3031,6 +3184,364 @@ export default function AIInsights() {
                         <p className="mb-0 small">Run scoring to see lead intelligence data.</p>
                     </div>
                 )}
+            </div>
+
+            {/* ─── 6 AI-Powered Features ─── */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '24px' }}>
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text, #111)', margin: 0 }}>
+                    <i className="fas fa-robot" style={{ color: '#7c3aed', marginRight: '8px' }} />
+                    AI-Powered Features
+                </h2>
+
+                {/* ── 1. Reel-to-Ad Bridge Analyzer ── */}
+                <div className="ai2-analysis-card">
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                        <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                <span style={{ fontSize: '1.2rem' }}>🎬</span>
+                                <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text, #111)', margin: 0 }}>Reel-to-Ad Bridge Analyzer</h3>
+                            </div>
+                            <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>
+                                Identifies which organic Reels should become paid ads based on watch time, saves, and share velocity.
+                            </p>
+                        </div>
+                        <button type="button" className="ai2-btn-primary" style={{ whiteSpace: 'nowrap', minWidth: '120px' }}
+                            disabled={aiFeatures.reelAdBridge.loading}
+                            onClick={() => runAiFeature('reelAdBridge', 'reel-ad-bridge', () => ({
+                                reels: getReelsForFeature(),
+                                bestAds: [],
+                            }))}>
+                            {aiFeatures.reelAdBridge.loading ? <><i className="fas fa-spinner fa-spin" /> Analyzing…</> : <><i className="fas fa-play" /> Run Analysis</>}
+                        </button>
+                    </div>
+                    {aiFeatures.reelAdBridge.error && (
+                        <p style={{ marginTop: '10px', padding: '8px 12px', background: '#fef2f2', borderRadius: '6px', color: '#dc2626', fontSize: '0.8rem' }}>
+                            <i className="fas fa-circle-exclamation" style={{ marginRight: '6px' }} />{aiFeatures.reelAdBridge.error}
+                        </p>
+                    )}
+                    {aiFeatures.reelAdBridge.result && (() => {
+                        const r = aiFeatures.reelAdBridge.result;
+                        const bridges = r.bridges || [];
+                        return (
+                            <div style={{ marginTop: '14px' }}>
+                                {bridges.length === 0 ? (
+                                    <p style={{ fontSize: '0.82rem', color: '#64748b' }}>No Reels data — load AI Insights first so media can be fetched, then run again.</p>
+                                ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        {bridges.map((b, idx) => (
+                                            <div key={idx} style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.82rem', color: '#374151' }}>
+                                                <div style={{ fontWeight: 600, marginBottom: '3px' }}>{b.headlineLine || b.id || `Reel ${idx + 1}`}
+                                                    {b.potential_score != null && <span style={{ marginLeft: '8px', fontSize: '0.75rem', color: '#7c3aed' }}>Score: {Number(b.potential_score).toFixed(0)}</span>}
+                                                </div>
+                                                {b.verdict && <div style={{ color: '#374151' }}>{b.verdict}</div>}
+                                                {b.hook_angle && <div style={{ color: '#0284c7', marginTop: '2px' }}>Hook: {b.hook_angle}</div>}
+                                                {b.resembles_ad && <div style={{ color: '#64748b', marginTop: '2px', fontSize: '0.75rem' }}>Resembles: {b.resembles_ad}</div>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
+                </div>
+
+                {/* ── 2. Content Velocity Tracker ── */}
+                <div className="ai2-analysis-card">
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                        <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                <span style={{ fontSize: '1.2rem' }}>⚡</span>
+                                <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text, #111)', margin: 0 }}>Content Velocity Tracker</h3>
+                            </div>
+                            <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>
+                                Flags Reels gaining momentum so you can boost them before the algorithm peaks.
+                            </p>
+                        </div>
+                        <button type="button" className="ai2-btn-primary" style={{ whiteSpace: 'nowrap', minWidth: '120px' }}
+                            disabled={aiFeatures.contentVelocity.loading}
+                            onClick={() => runAiFeature('contentVelocity', 'content-velocity', () => ({
+                                reels: getReelsForFeature(),
+                            }))}>
+                            {aiFeatures.contentVelocity.loading ? <><i className="fas fa-spinner fa-spin" /> Analyzing…</> : <><i className="fas fa-play" /> Run Analysis</>}
+                        </button>
+                    </div>
+                    {aiFeatures.contentVelocity.error && (
+                        <p style={{ marginTop: '10px', padding: '8px 12px', background: '#fef2f2', borderRadius: '6px', color: '#dc2626', fontSize: '0.8rem' }}>
+                            <i className="fas fa-circle-exclamation" style={{ marginRight: '6px' }} />{aiFeatures.contentVelocity.error}
+                        </p>
+                    )}
+                    {aiFeatures.contentVelocity.result && (() => {
+                        const r = aiFeatures.contentVelocity.result;
+                        const alerts = r.alerts || [];
+                        return (
+                            <div style={{ marginTop: '14px' }}>
+                                {r.totalReels != null && (
+                                    <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '10px' }}>
+                                        Analysed {r.totalReels} Reels · {r.flaggedCount || 0} showing momentum signals
+                                    </p>
+                                )}
+                                {alerts.length === 0 ? (
+                                    <p style={{ fontSize: '0.82rem', color: '#64748b' }}>No momentum signals detected in the current Reels set.</p>
+                                ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        {alerts.map((a, idx) => (
+                                            <div key={idx} style={{ padding: '10px 14px', background: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0', fontSize: '0.82rem', color: '#374151' }}>
+                                                <div style={{ fontWeight: 600 }}>{a.alert || '⚡'} {a.headlineLine || `Reel ${idx + 1}`}</div>
+                                                {a.action && <div style={{ color: '#0284c7', marginTop: '3px' }}>Action: {a.action}</div>}
+                                                {a.reason && <div style={{ color: '#64748b', marginTop: '2px', fontSize: '0.75rem' }}>{a.reason}</div>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
+                </div>
+
+                {/* ── 3. Post-Time Heatmap & Scheduler ── */}
+                <div className="ai2-analysis-card">
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                        <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                <span style={{ fontSize: '1.2rem' }}>🕐</span>
+                                <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text, #111)', margin: 0 }}>Post-Time Heatmap & Scheduler</h3>
+                            </div>
+                            <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>
+                                Recommends the optimal 7-day posting schedule based on audience engagement patterns.
+                            </p>
+                        </div>
+                        <button type="button" className="ai2-btn-primary" style={{ whiteSpace: 'nowrap', minWidth: '120px' }}
+                            disabled={aiFeatures.postTimeHeatmap.loading}
+                            onClick={() => runAiFeature('postTimeHeatmap', 'post-time-heatmap', () => ({
+                                reels: getReelsForFeature(),
+                            }))}>
+                            {aiFeatures.postTimeHeatmap.loading ? <><i className="fas fa-spinner fa-spin" /> Analyzing…</> : <><i className="fas fa-play" /> Run Analysis</>}
+                        </button>
+                    </div>
+                    {aiFeatures.postTimeHeatmap.error && (
+                        <p style={{ marginTop: '10px', padding: '8px 12px', background: '#fef2f2', borderRadius: '6px', color: '#dc2626', fontSize: '0.8rem' }}>
+                            <i className="fas fa-circle-exclamation" style={{ marginRight: '6px' }} />{aiFeatures.postTimeHeatmap.error}
+                        </p>
+                    )}
+                    {aiFeatures.postTimeHeatmap.result && (() => {
+                        const r = aiFeatures.postTimeHeatmap.result;
+                        const insights = r.insights || {};
+                        const windows = insights.windows || [];
+                        return (
+                            <div style={{ marginTop: '14px' }}>
+                                {insights.schedule && (
+                                    <div style={{ padding: '10px 14px', background: '#faf5ff', borderRadius: '8px', border: '1px solid #e9d5ff', fontSize: '0.82rem', color: '#374151', marginBottom: '10px' }}>
+                                        <span style={{ fontWeight: 700, color: '#7c3aed' }}>Recommended Schedule: </span>{insights.schedule}
+                                    </div>
+                                )}
+                                {windows.length > 0 && (
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px', marginBottom: '10px' }}>
+                                        {windows.map((w, idx) => (
+                                            <div key={idx} style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.82rem', textAlign: 'center' }}>
+                                                <div style={{ fontWeight: 700, color: '#374151' }}>{w.day}</div>
+                                                <div style={{ color: '#7c3aed', fontWeight: 600 }}>{w.hour_ist}</div>
+                                                {w.reason && <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '3px' }}>{w.reason}</div>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {insights.insight && <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0 }}>{insights.insight}</p>}
+                            </div>
+                        );
+                    })()}
+                </div>
+
+                {/* ── 4. Ad Fatigue Predictor ── */}
+                <div className="ai2-analysis-card">
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                        <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                <span style={{ fontSize: '1.2rem' }}>📉</span>
+                                <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text, #111)', margin: 0 }}>Ad Fatigue Predictor</h3>
+                            </div>
+                            <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>
+                                Flags ads showing frequency fatigue before CPL spikes so you can refresh creatives proactively.
+                            </p>
+                        </div>
+                        <button type="button" className="ai2-btn-primary" style={{ whiteSpace: 'nowrap', minWidth: '120px' }}
+                            disabled={aiFeatures.fatiguePrediction.loading}
+                            onClick={() => {
+                                const { from: df, to: dt } = resolvedInsightsRange;
+                                const creatives = (insightsRowsCache || []).slice(0, 30).map(r => {
+                                    const dateStart = r.date_start || df;
+                                    const lifespan_days = Math.max(1, Math.round((new Date(dt) - new Date(dateStart)) / 86400000));
+                                    const freq = Number(r.frequency || 1);
+                                    const fatigueScore = Math.min(100, Math.max(0, (freq - 1) * 25 + (r.impressions > 500 && Number(r.leads || 0) === 0 ? 20 : 0)));
+                                    return { name: r.ad_name || 'Ad', campaign: r.campaign_name, fatigueScore, lifespan_days, frequency: freq, leads: Number(r.leads || 0), spend: Number(r.spend || 0), impressions: Number(r.impressions || 0) };
+                                });
+                                runAiFeature('fatiguePrediction', 'fatigue-prediction', () => ({ creatives }));
+                            }}>
+                            {aiFeatures.fatiguePrediction.loading ? <><i className="fas fa-spinner fa-spin" /> Analyzing…</> : <><i className="fas fa-play" /> Run Analysis</>}
+                        </button>
+                    </div>
+                    {aiFeatures.fatiguePrediction.error && (
+                        <p style={{ marginTop: '10px', padding: '8px 12px', background: '#fef2f2', borderRadius: '6px', color: '#dc2626', fontSize: '0.8rem' }}>
+                            <i className="fas fa-circle-exclamation" style={{ marginRight: '6px' }} />{aiFeatures.fatiguePrediction.error}
+                        </p>
+                    )}
+                    {aiFeatures.fatiguePrediction.result && (() => {
+                        const r = aiFeatures.fatiguePrediction.result;
+                        const preds = r.predictions || [];
+                        return (
+                            <div style={{ marginTop: '14px' }}>
+                                {preds.length === 0 ? (
+                                    <p style={{ fontSize: '0.82rem', color: '#64748b' }}>No fatigue signals detected. Load Ad Insights data first.</p>
+                                ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        {preds.map((p, idx) => {
+                                            const isUrgent = String(p.urgency || '').toLowerCase().includes('immediate');
+                                            return (
+                                                <div key={idx} style={{ padding: '10px 14px', background: isUrgent ? '#fff7ed' : '#f8fafc', borderRadius: '8px', border: `1px solid ${isUrgent ? '#fed7aa' : '#e2e8f0'}`, fontSize: '0.82rem', color: '#374151' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                                                        {isUrgent && <i className="fas fa-triangle-exclamation" style={{ color: '#ea580c' }} />}
+                                                        <span style={{ fontWeight: 600 }}>{p.name}</span>
+                                                    </div>
+                                                    {p.urgency && <div style={{ color: isUrgent ? '#ea580c' : '#374151', marginBottom: '2px' }}>{p.urgency}</div>}
+                                                    {p.recommendation && <div style={{ color: '#374151' }}>{p.recommendation}</div>}
+                                                    {p.budget_action && <div style={{ color: '#64748b', marginTop: '2px', fontSize: '0.75rem' }}>Budget: {p.budget_action}</div>}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
+                </div>
+
+                {/* ── 5. CPL vs Watch-Time Optimizer ── */}
+                <div className="ai2-analysis-card">
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                        <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                <span style={{ fontSize: '1.2rem' }}>💰</span>
+                                <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text, #111)', margin: 0 }}>CPL vs Watch-Time Optimizer</h3>
+                            </div>
+                            <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>
+                                Correlates average watch time with cost-per-lead to find the optimal video length that minimises CPL.
+                            </p>
+                        </div>
+                        <button type="button" className="ai2-btn-primary" style={{ whiteSpace: 'nowrap', minWidth: '120px' }}
+                            disabled={aiFeatures.cplWatchtime.loading}
+                            onClick={() => {
+                                const ads = (insightsRowsCache || []).slice(0, 30).map(r => {
+                                    const leads = Number(r.leads || 0);
+                                    const spend = Number(r.spend || 0);
+                                    return { name: r.ad_name || 'Ad', campaign: r.campaign_name, leads, spend, cpl: leads > 0 ? spend / leads : 0 };
+                                }).filter(a => a.leads > 0 || a.spend > 0);
+                                runAiFeature('cplWatchtime', 'cpl-watchtime', () => ({ reels: getReelsForFeature(), ads }));
+                            }}>
+                            {aiFeatures.cplWatchtime.loading ? <><i className="fas fa-spinner fa-spin" /> Analyzing…</> : <><i className="fas fa-play" /> Run Analysis</>}
+                        </button>
+                    </div>
+                    {aiFeatures.cplWatchtime.error && (
+                        <p style={{ marginTop: '10px', padding: '8px 12px', background: '#fef2f2', borderRadius: '6px', color: '#dc2626', fontSize: '0.8rem' }}>
+                            <i className="fas fa-circle-exclamation" style={{ marginRight: '6px' }} />{aiFeatures.cplWatchtime.error}
+                        </p>
+                    )}
+                    {aiFeatures.cplWatchtime.result && (() => {
+                        const r = aiFeatures.cplWatchtime.result;
+                        const corr = r.correlation || {};
+                        const insight = r.insight || {};
+                        return (
+                            <div style={{ marginTop: '14px' }}>
+                                {corr.value != null && (
+                                    <div style={{ padding: '10px 14px', background: '#f0fdf4', borderRadius: '8px', border: '1px solid #86efac', fontSize: '0.82rem', marginBottom: '10px' }}>
+                                        <span style={{ fontWeight: 700 }}>Correlation (watch-time vs CPL): </span>
+                                        <span style={{ color: corr.value < 0 ? '#16a34a' : '#dc2626', fontWeight: 700 }}>{Number(corr.value).toFixed(3)}</span>
+                                        {corr.interpretation && <span style={{ color: '#374151', marginLeft: '8px' }}>— {corr.interpretation}</span>}
+                                    </div>
+                                )}
+                                {insight.threshold_insight && (
+                                    <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.82rem', marginBottom: '8px', color: '#374151' }}>
+                                        <span style={{ fontWeight: 600 }}>Threshold: </span>{insight.threshold_insight}
+                                    </div>
+                                )}
+                                {insight.recommendation && (
+                                    <div style={{ padding: '10px 14px', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd', fontSize: '0.82rem', color: '#374151' }}>
+                                        <span style={{ fontWeight: 600 }}>Recommendation: </span>{insight.recommendation}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
+                </div>
+
+                {/* ── 6. Budget Reallocation Engine ── */}
+                <div className="ai2-analysis-card">
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                        <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                <span style={{ fontSize: '1.2rem' }}>🧠</span>
+                                <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text, #111)', margin: 0 }}>Budget Reallocation Engine</h3>
+                            </div>
+                            <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>
+                                Recommends moving budget from underperforming campaigns to high-efficiency ones using AI-driven analysis.
+                            </p>
+                        </div>
+                        <button type="button" className="ai2-btn-primary" style={{ whiteSpace: 'nowrap', minWidth: '120px' }}
+                            disabled={aiFeatures.budgetRealloc.loading}
+                            onClick={() => {
+                                const rows = insightsRowsCache || [];
+                                const summary = rows.reduce((acc, r) => { acc.spend += Number(r.spend || 0); acc.leads += Number(r.leads || 0); return acc; }, { spend: 0, leads: 0 });
+                                summary.cpl = summary.leads > 0 ? summary.spend / summary.leads : 0;
+                                const bestAd = rows.map(r => { const leads = Number(r.leads || 0); const spend = Number(r.spend || 0); const cpl = leads > 0 ? spend / leads : Infinity; return { name: r.ad_name, campaign: r.campaign_name, leads, spend, cpl }; }).filter(a => a.leads > 0).sort((a, b) => a.cpl - b.cpl)[0] || {};
+                                runAiFeature('budgetRealloc', 'budget-reallocation', () => ({ bestAd, summary, dateRange: { from: resolvedInsightsRange.from, to: resolvedInsightsRange.to } }));
+                            }}>
+                            {aiFeatures.budgetRealloc.loading ? <><i className="fas fa-spinner fa-spin" /> Analyzing…</> : <><i className="fas fa-play" /> Run Analysis</>}
+                        </button>
+                    </div>
+                    {aiFeatures.budgetRealloc.error && (
+                        <p style={{ marginTop: '10px', padding: '8px 12px', background: '#fef2f2', borderRadius: '6px', color: '#dc2626', fontSize: '0.8rem' }}>
+                            <i className="fas fa-circle-exclamation" style={{ marginRight: '6px' }} />{aiFeatures.budgetRealloc.error}
+                        </p>
+                    )}
+                    {aiFeatures.budgetRealloc.result && (() => {
+                        const r = aiFeatures.budgetRealloc.result;
+                        const result = r.result || {};
+                        return (
+                            <div style={{ marginTop: '14px' }}>
+                                {(r.cplGapPct != null || r.recommendedShift != null) && (
+                                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                                        {r.cplGapPct != null && (
+                                            <div style={{ padding: '8px 14px', background: '#faf5ff', borderRadius: '8px', border: '1px solid #e9d5ff', fontSize: '0.82rem' }}>
+                                                <span style={{ fontWeight: 700, color: '#7c3aed' }}>CPL gap vs best ad: </span>{Number(r.cplGapPct).toFixed(1)}%
+                                            </div>
+                                        )}
+                                        {r.recommendedShift > 0 && (
+                                            <div style={{ padding: '8px 14px', background: '#f0fdf4', borderRadius: '8px', border: '1px solid #86efac', fontSize: '0.82rem' }}>
+                                                <span style={{ fontWeight: 700, color: '#16a34a' }}>Recommended shift: </span>₹{Number(r.recommendedShift).toLocaleString('en-IN')}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                                {result.recommendation && (
+                                    <div style={{ padding: '10px 14px', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd', fontSize: '0.82rem', color: '#374151', marginBottom: '8px' }}>
+                                        <span style={{ fontWeight: 600 }}>Recommendation: </span>{result.recommendation}
+                                    </div>
+                                )}
+                                {result.expected_leads_increase != null && (
+                                    <div style={{ padding: '8px 14px', background: '#f0fdf4', borderRadius: '8px', border: '1px solid #86efac', fontSize: '0.82rem', marginBottom: '8px' }}>
+                                        <span style={{ fontWeight: 700, color: '#16a34a' }}>Expected leads increase: </span>+{result.expected_leads_increase}
+                                    </div>
+                                )}
+                                {result.reduce_from && (
+                                    <div style={{ padding: '8px 14px', background: '#fff7ed', borderRadius: '8px', border: '1px solid #fed7aa', fontSize: '0.82rem', marginBottom: '8px', color: '#374151' }}>
+                                        <span style={{ fontWeight: 700, color: '#ea580c' }}>Reduce from: </span>{result.reduce_from}
+                                    </div>
+                                )}
+                                {result.risk_factors && (
+                                    <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0 }}>⚠ {result.risk_factors}</p>
+                                )}
+                            </div>
+                        );
+                    })()}
+                </div>
             </div>
         </div>
     );

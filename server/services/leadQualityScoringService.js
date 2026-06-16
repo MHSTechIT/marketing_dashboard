@@ -435,24 +435,25 @@ async function getLeadScores(opts = {}) {
   const baseSelect =
     'id, lead_id, name, phone, campaign_id, score, category, sugar_level, created_at, sugar_segment, tier, score_breakdown, methodology';
 
+  // Filter by the lead's actual creation date stored in score_breakdown->date_time
+  // (not updated_at which is when scoring ran — that caused post-scoring leads to be excluded).
+  // Order by updated_at DESC so freshly re-scored leads surface first.
   let query = supabase.from('lead_scores').select(baseSelect).order('updated_at', { ascending: false }).limit(limit);
 
-  // Use updated_at so re-scored rows (old created_at) still appear in the AI Insights window.
-  if (dateFrom) query = query.gte('updated_at', dateFrom + 'T00:00:00');
-  if (dateTo) query = query.lte('updated_at', dateTo + 'T23:59:59');
+  if (dateFrom) query = query.gte('score_breakdown->>date_time', dateFrom + 'T00:00:00');
+  if (dateTo)   query = query.lte('score_breakdown->>date_time', dateTo   + 'T23:59:59');
   if (campaignId) query = query.eq('campaign_id', campaignId);
 
   const { data, error } = await query;
   if (error) {
     const msg = error.message || '';
-    if (/sugar_segment|tier|score_breakdown|methodology|column/i.test(msg)) {
+    // Fallback: if JSON path filter not supported, return all recent rows without date filter
+    if (/score_breakdown|json|column/i.test(msg) || /sugar_segment|tier|methodology/i.test(msg)) {
       let q2 = supabase
         .from('lead_scores')
-        .select('id, lead_id, name, phone, campaign_id, score, category, sugar_level, created_at')
+        .select('id, lead_id, name, phone, campaign_id, score, category, sugar_level, created_at, score_breakdown')
         .order('updated_at', { ascending: false })
         .limit(limit);
-      if (dateFrom) q2 = q2.gte('updated_at', dateFrom + 'T00:00:00');
-      if (dateTo) q2 = q2.lte('updated_at', dateTo + 'T23:59:59');
       if (campaignId) q2 = q2.eq('campaign_id', campaignId);
       const r2 = await q2;
       if (r2.error) throw r2.error;

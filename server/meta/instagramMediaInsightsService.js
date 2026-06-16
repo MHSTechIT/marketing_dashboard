@@ -15,7 +15,7 @@ const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 
 const META_API_VERSION = process.env.META_IG_API_VERSION || "v24.0";
-const rateLimiter = require("../services/meta/rateLimiter");
+const igRateLimiter = require("../services/meta/igRateLimiter");
 const {
   resolveIgAccountsViaInstagramAccountsEdge,
   resolveIgAccountsFromPages,
@@ -83,7 +83,7 @@ async function fetchMediaList(igAccountId, accessToken) {
   let params = { fields, limit, access_token: accessToken };
 
   while (url) {
-    const data = await rateLimiter.schedule(() => graphApiGet(url, params));
+    const data = await igRateLimiter.schedule(() => graphApiGet(url, params));
     if (!data) break;
 
     const items = data.data || [];
@@ -189,7 +189,7 @@ async function fetchMediaInsights(media, accessToken) {
   // ig_reels_video_follow_count is fetched in a SEPARATE call so that if it fails (error #100),
   // it cannot zero-out the main metrics (views, likes, comments, saved, shares).
   if (reel) {
-    const data = await rateLimiter.schedule(() =>
+    const data = await igRateLimiter.schedule(() =>
       graphApiGet(baseUrl, {
         metric: "views,reach,ig_reels_avg_watch_time,total_interactions,likes,comments,saved,shares",
         access_token: accessToken,
@@ -235,19 +235,8 @@ async function fetchMediaInsights(media, accessToken) {
     const comments = metrics.comments ?? 0;
     const saved = metrics.saved ?? 0;
     const shares = metrics.shares ?? 0;
-    // "follows" is the current valid metric name (ig_reels_video_follow_count renamed in v22.0+).
-    // Fetched in a SEPARATE call so a failure here cannot zero-out the main metrics above.
-    let follows = 0;
-    const followData = await rateLimiter.schedule(() =>
-      graphApiGet(baseUrl, {
-        metric: "follows",
-        period: "lifetime",
-        access_token: accessToken,
-      })
-    );
-    if (followData && Array.isArray(followData.data) && followData.data.length > 0) {
-      follows = extractMetricValue(followData.data[0]);
-    }
+    // follows metric skipped — not used in reel scoring, saves one API call per reel
+    const follows = 0;
 
     const totalPlays = Number(plays) || 0;
     const hook_rate = calcHookRate(views, totalPlays) ?? (reach > 0 ? calcHookRate(views, reach) : null);
@@ -280,7 +269,7 @@ async function fetchMediaInsights(media, accessToken) {
   }
 
   // Non-Reels (Posts/Stories): views, reach, total_interactions, likes, comments, saved, shares
-  const data = await rateLimiter.schedule(() =>
+  const data = await igRateLimiter.schedule(() =>
     graphApiGet(baseUrl, {
       metric: "views,reach,total_interactions,likes,comments,saved,shares",
       access_token: accessToken,
@@ -450,7 +439,7 @@ function buildByContentTypeAggregates(media) {
   return result;
 }
 
-/** Max number of media items to fetch insights for (reduces API calls and load time). */
+/** Default max media items per account. Can be overridden per-call via opts.limit. */
 const MEDIA_INSIGHTS_LIMIT = 100;
 
 /**
@@ -501,7 +490,7 @@ const STORY_FETCH_LIMIT = 25;
  */
 async function fetchStoryIds(igAccountId, accessToken) {
   const url = `https://graph.facebook.com/${META_API_VERSION}/${igAccountId}/stories`;
-  const data = await rateLimiter.schedule(() =>
+  const data = await igRateLimiter.schedule(() =>
     graphApiGet(url, { access_token: accessToken })
   );
   if (!data || !Array.isArray(data.data)) return [];
@@ -517,7 +506,7 @@ async function fetchStoryIds(igAccountId, accessToken) {
 async function fetchMediaById(mediaId, accessToken) {
   const fields = "id,media_type,product_type,video_duration,permalink,timestamp,caption,thumbnail_url,media_url";
   const url = `https://graph.facebook.com/${META_API_VERSION}/${mediaId}`;
-  const item = await rateLimiter.schedule(() =>
+  const item = await igRateLimiter.schedule(() =>
     graphApiGet(url, { fields, access_token: accessToken })
   );
   if (!item || !item.id) return null;
@@ -591,13 +580,15 @@ async function fetchAccountMediaInsights(igAccountId, accessToken, opts = {}) {
 
   if (filtered.length === 0) return [];
 
+  const effectiveLimit = (opts.limit && Number(opts.limit) > 0) ? Number(opts.limit) : MEDIA_INSIGHTS_LIMIT;
+
   // Sort by timestamp descending (most recent first) and cap to limit
   filtered = [...filtered].sort((a, b) => {
     const ta = a.timestamp ? new Date(a.timestamp).getTime() : 0;
     const tb = b.timestamp ? new Date(b.timestamp).getTime() : 0;
     return tb - ta;
   });
-  filtered = takeDiverseByMonthForInsights(filtered, MEDIA_INSIGHTS_LIMIT);
+  filtered = takeDiverseByMonthForInsights(filtered, effectiveLimit);
 
   const results = await Promise.all(filtered.map((media) => fetchMediaInsights(media, accessToken)));
   return results;
@@ -655,23 +646,33 @@ async function fetchInstagramMediaInsights(opts = {}) {
   const warnings = [];
   let allMedia = [];
 
-  for (const accountId of accountIds) {
-    try {
-      const list = await fetchAccountMediaInsights(accountId, accessToken, {
+  // Process all accounts in parallel — reduces wall time from N×T to max(T) per account.
+  const accountResults = await Promise.allSettled(
+    accountIds.map((accountId) =>
+      fetchAccountMediaInsights(accountId, accessToken, {
         contentType: opts.contentType,
         from: opts.from,
         to: opts.to,
-      });
-      allMedia.push(...list);
-      if (opts.contentType === "stories" && list.length > 0) {
-        try {
-          await storySnapshots.saveStories(accountId, list);
-        } catch (_) {
-          // Table may not exist; don't fail the request
-        }
+        limit: opts.limit,
+      })
+    )
+  );
+
+  for (let i = 0; i < accountIds.length; i++) {
+    const result = accountResults[i];
+    const accountId = accountIds[i];
+    if (result.status === "rejected") {
+      warnings.push(`Account ${accountId}: ${result.reason?.message || result.reason}`);
+      continue;
+    }
+    const list = result.value || [];
+    allMedia.push(...list);
+    if (opts.contentType === "stories" && list.length > 0) {
+      try {
+        await storySnapshots.saveStories(accountId, list);
+      } catch (_) {
+        // Table may not exist; don't fail the request
       }
-    } catch (err) {
-      warnings.push(`Account ${accountId}: ${err?.message || err}`);
     }
   }
 

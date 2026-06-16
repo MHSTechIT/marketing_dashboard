@@ -517,28 +517,42 @@ export default function BestPerformingReel() {
         (sum, m) => sum + (Number(m.video_avg_time_watched || 0) * Number(m.video_views || m.views || 0)),
         0
     );
+    // True only when at least one reel carries a meaningful avg watch time (≥1s) — guards against near-zero API artefacts
+    const hasWatchTimeData = reelsFromMedia.some((m) => m.video_avg_time_watched != null && Number(m.video_avg_time_watched) >= 1)
+        && totalWatchTimeSeconds >= 1;
     const hours = totalWatchTimeSeconds / 3600;
-    const watchTimeDisplay = hours >= 1e6
-        ? `${(hours / 1e6).toFixed(1)}M h`
-        : hours >= 1000
-            ? `${(hours / 1000).toFixed(1)}K h`
-            : hours >= 1
-                ? `${hours.toFixed(1)} h`
-                : totalWatchTimeSeconds >= 60
-                    ? `${(totalWatchTimeSeconds / 60).toFixed(0)} m`
-                    : `${Math.round(totalWatchTimeSeconds)} s`;
-    const avgHookRateLive = aggForTab.hook_rate != null ? aggForTab.hook_rate : (reelsFromMedia.length > 0
-        ? Math.round((reelsFromMedia.map((m) => m.hook_rate).filter((r) => r != null && !Number.isNaN(r)).reduce((a, b) => a + b, 0) / reelsFromMedia.filter((m) => m.hook_rate != null).length) * 100) / 100
-        : null);
+    const watchTimeDisplay = !hasWatchTimeData ? '—'
+        : hours >= 1e6
+            ? `${(hours / 1e6).toFixed(1)}M h`
+            : hours >= 1000
+                ? `${(hours / 1000).toFixed(1)}K h`
+                : hours >= 1
+                    ? `${hours.toFixed(1)} h`
+                    : totalWatchTimeSeconds >= 60
+                        ? `${(totalWatchTimeSeconds / 60).toFixed(0)} m`
+                        : `${Math.round(totalWatchTimeSeconds)} s`;
+    // Guard: avoid NaN when aggForTab.hook_rate itself is NaN, or when no reels have hook_rate (0/0)
+    const reelsWithHookRate = reelsFromMedia.filter((m) => m.hook_rate != null && !Number.isNaN(m.hook_rate));
+    const avgHookRateLive = (aggForTab.hook_rate != null && !Number.isNaN(aggForTab.hook_rate))
+        ? aggForTab.hook_rate
+        : reelsWithHookRate.length > 0
+            ? Math.round((reelsWithHookRate.reduce((a, m) => a + m.hook_rate, 0) / reelsWithHookRate.length) * 100) / 100
+            : null;
     const contentWinRateLive = aggForTab.content_win_rate ?? 0;
 
-    // Demographics: prefer Instagram; fall back to Ads Insights (age_gender, region, country) when no Instagram
+    // Demographics: prefer Instagram; fall back to Facebook page audience, then Ads Insights
     const ageBreakdown = demographicsData?.age_breakdown ?? [];
     const genderBreakdown = demographicsData?.gender_breakdown ?? [];
     const countryBreakdown = demographicsData?.country_breakdown ?? [];
     const cityBreakdown = demographicsData?.city_breakdown ?? [];
+    // Facebook page audience city/country — used when Platform=Facebook (Instagram data not fetched)
+    const fbCityBreakdown = isFacebookSelected ? (fbAudienceData?.city_breakdown ?? []) : [];
+    const fbCountryBreakdown = isFacebookSelected ? (fbAudienceData?.country_breakdown ?? []) : [];
+    // Effective location: Instagram city → Facebook city → Instagram country → Facebook country
+    const effectiveCityBreakdown = cityBreakdown.length > 0 ? cityBreakdown : fbCityBreakdown;
+    const effectiveCountryBreakdown = countryBreakdown.length > 0 ? countryBreakdown : fbCountryBreakdown;
     // Location card: prefer city count (city-level) when available, else country count, else Ads region/country
-    const locationBreakdown = cityBreakdown.length > 0 ? cityBreakdown : countryBreakdown;
+    const locationBreakdown = effectiveCityBreakdown.length > 0 ? effectiveCityBreakdown : effectiveCountryBreakdown;
 
     // Fallback counts from Ads Insights when Instagram demographics missing (e.g. page has no IG linked)
     const adsAgeGender = adsDemographicsData?.age_gender_breakdown ?? [];
@@ -549,6 +563,13 @@ export default function BestPerformingReel() {
         : 0;
     const genderGroupsCountFromAds = adsAgeGender.length > 0
         ? new Set(adsAgeGender.map((r) => (r.gender || '').toLowerCase()).filter(Boolean)).size
+        : 0;
+    // Distinct age group count and gender count from Facebook page audience (which may include Instagram fallback data)
+    const fbAgeGroupCount = isFacebookSelected && fbAudienceData?.age_breakdown?.length > 0
+        ? new Set(fbAudienceData.age_breakdown.map((r) => r.age).filter(Boolean)).size
+        : 0;
+    const fbGenderGroupCount = isFacebookSelected
+        ? (fbAudienceData?.gender_breakdown?.filter((g) => g.value > 0).length || 0)
         : 0;
     const locationCountFromAds = adsRegionBreakdown.length > 0 ? adsRegionBreakdown.length : adsCountryBreakdown.length;
 
@@ -716,22 +737,26 @@ export default function BestPerformingReel() {
 
     const COLORS = ['#0369a1', '#38bdf8', '#0ea5e9', '#60a5fa', '#3b82f6', '#8b5cf6', '#ec4899', '#fb923c'];
 
-    const watchTimeChartData = hasLiveData && reelsFromMedia.length > 0
+    // Only show live watch time bar when the field actually has data (Facebook API never returns video_avg_time_watched)
+    const watchTimeChartData = hasLiveData && hasWatchTimeData
         ? [{ time: 'Total (min)', value: Math.round(totalWatchTimeSeconds / 60) }]
         : watchTimeData;
     const ageChartData = hasLiveData && ageBreakdown.length > 0
         ? ageBreakdown.map((r, i) => ({ age: r.age || r.age_range || 'N/A', value: r.value, color: COLORS[i % COLORS.length] }))
         : ageData;
-    const genderChartData = hasLiveData && genderBreakdown.length > 0
-        ? genderBreakdown.map((r, i) => ({ name: r.gender || String(r.name || 'N/A'), value: r.value, color: COLORS[i % COLORS.length] }))
+    // Gender pie chart: prefer Instagram audience data; fall back to Facebook page audience (which may include IG follower data)
+    const effectiveGenderBreakdown = genderBreakdown.length > 0 ? genderBreakdown
+        : (isFacebookSelected && fbAudienceData?.gender_breakdown?.length > 0 ? fbAudienceData.gender_breakdown : []);
+    const genderChartData = hasLiveData && effectiveGenderBreakdown.length > 0
+        ? effectiveGenderBreakdown.filter((r) => r.value > 0).map((r, i) => ({ name: r.gender || String(r.name || 'N/A'), value: r.value, color: i === 0 ? '#0369a1' : '#ec4899' }))
         : [];
     const _locationChartData = hasLiveData && countryBreakdown.length > 0
         ? countryBreakdown.map((r, i) => ({ location: r.country || r.location || 'N/A', value: r.value, color: COLORS[i % COLORS.length] }))
         : locationData;
 
-    // Top towns/cities (city-level) from Instagram audience for Location Distribution — percentages, sorted, top 10
+    // Top towns/cities — prefer Instagram city data, fall back to Facebook page city data
     const topTownsCitiesDisplay = (() => {
-        const rows = cityBreakdown || [];
+        const rows = effectiveCityBreakdown.length > 0 ? effectiveCityBreakdown : [];
         if (!rows.length) return [];
         const total = rows.reduce((s, r) => s + (Number(r.value) || 0), 0);
         if (total === 0) return [];
@@ -744,8 +769,19 @@ export default function BestPerformingReel() {
             .slice(0, 10);
     })();
 
-    // Top regions or countries from Ads Insights (fallback when no Instagram city data)
+    // Top regions or countries — prefer Facebook page country data, then Ads Insights
     const topRegionsOrCountriesFromAds = (() => {
+        // When Facebook is selected and page has country data, use it first
+        if (fbCountryBreakdown.length > 0 && effectiveCityBreakdown.length === 0) {
+            const total = fbCountryBreakdown.reduce((s, r) => s + (Number(r.value) || 0), 0);
+            if (total > 0) {
+                const list = fbCountryBreakdown
+                    .map((r) => ({ name: r.country || 'Unknown', val: Math.round(((Number(r.value) || 0) / total) * 1000) / 10 }))
+                    .sort((a, b) => b.val - a.val)
+                    .slice(0, 10);
+                return { list, label: 'Top countries', subtitle: 'From Facebook Page audience' };
+            }
+        }
         const rows = adsRegionBreakdown.length > 0 ? adsRegionBreakdown : adsCountryBreakdown;
         if (!rows.length) return { list: [], label: null, subtitle: null };
         const total = rows.reduce((s, r) => s + (Number(r.reach) || Number(r.impressions) || 0), 0);
@@ -838,6 +874,8 @@ export default function BestPerformingReel() {
     const ageGenderChartFromFacebook = Boolean(
         reelPage && isFacebookSelected && fbAudienceData?.age_breakdown?.length && buildAgeGenderFromFacebookBreakdown(fbAudienceData.age_breakdown)?.length > 0
     );
+    // Number of age groups that have any data in the chart (used for Age KPI count when Instagram data is absent)
+    const ageGroupsFromChart = ageGenderChartData ? ageGenderChartData.filter((r) => r.men > 0 || r.women > 0).length : 0;
 
     // 3. CONTENT LIST FOR TABS — live data only; no sample/placeholder when no page or no media
     const emptyList = [];
@@ -1070,7 +1108,7 @@ export default function BestPerformingReel() {
                         transition={{ type: "spring", stiffness: 300 }}
                     >
                         <div className="label">Watch Time</div>
-                        <div className="value">{hasLiveData ? watchTimeDisplay : (totals.watch / 1000).toFixed(0)}<span className="val-suffix">{hasLiveData ? '' : 'K'}</span></div>
+                        <div className="value">{watchTimeDisplay}<span className="val-suffix"></span></div>
                     </motion.button>
                     <motion.button
                         className={`kpi-card-reel bg-purple-dark ${activeChart === 'age' ? 'active-chart' : ''}`}
@@ -1081,7 +1119,7 @@ export default function BestPerformingReel() {
                     >
                         <div className="label">Age</div>
                         <div className="value">
-                            {loadingDemographics && !adsDemographicsData ? '...' : (ageBreakdown.length || ageGroupsCountFromAds || (reelPage ? 0 : 5))}
+                            {(loadingDemographics || fbAudienceLoading) && !adsDemographicsData ? '...' : (ageBreakdown.length || fbAgeGroupCount || ageGroupsCountFromAds || ageGroupsFromChart || (reelPage ? 0 : 5))}
                             <span className="val-suffix">Groups</span>
                         </div>
                     </motion.button>
@@ -1094,7 +1132,7 @@ export default function BestPerformingReel() {
                     >
                         <div className="label">Gender</div>
                         <div className="value">
-                            {loadingDemographics && !adsDemographicsData ? '...' : (genderBreakdown.length || genderGroupsCountFromAds || (reelPage ? 0 : 3))}
+                            {(loadingDemographics || fbAudienceLoading) && !adsDemographicsData ? '...' : (genderBreakdown.length || fbGenderGroupCount || genderGroupsCountFromAds || (reelPage ? 0 : 3))}
                             <span className="val-suffix">Groups</span>
                         </div>
                     </motion.button>
@@ -1107,8 +1145,8 @@ export default function BestPerformingReel() {
                     >
                         <div className="label">Location</div>
                         <div className="value">
-                            {loadingDemographics && !adsDemographicsData ? '...' : (locationBreakdown.length || locationCountFromAds || (reelPage ? 0 : 6))}
-                            <span className="val-suffix">{cityBreakdown.length > 0 ? 'Cities' : (adsRegionBreakdown.length > 0 ? 'Regions' : 'Countries')}</span>
+                            {loadingDemographics && !adsDemographicsData ? '...' : (locationBreakdown.length || locationCountFromAds || topRegionsOrCountriesFromAds.list.length || (reelPage ? 0 : 6))}
+                            <span className="val-suffix">{effectiveCityBreakdown.length > 0 ? 'Cities' : (adsRegionBreakdown.length > 0 ? 'Regions' : 'Countries')}</span>
                         </div>
                     </motion.button>
                     <div className="kpi-card-reel bg-teal">
@@ -1144,21 +1182,29 @@ export default function BestPerformingReel() {
                                             <div className="fw-bold">Watch Time Distribution</div>
                                         </div>
                                     </div>
-                                    <div style={{ width: '100%', height: 300 }}>
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <ComposedChart data={watchTimeChartData}>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                                <XAxis dataKey="time" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                                                <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                                                <Tooltip />
-                                                <Bar dataKey="value" radius={[8, 8, 0, 0]} animationBegin={0} animationDuration={800}>
-                                                    {watchTimeChartData.map((entry, index) => (
-                                                        <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
-                                                    ))}
-                                                </Bar>
-                                            </ComposedChart>
-                                        </ResponsiveContainer>
-                                    </div>
+                                    {!hasWatchTimeData ? (
+                                        <div style={{ height: 300, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', gap: 8 }}>
+                                            <svg width="40" height="40" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                                            <div style={{ fontWeight: 600, fontSize: 14, color: '#64748b' }}>Watch time data not available</div>
+                                            <div style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center', maxWidth: 320 }}>Facebook Page API does not return average watch time in the media listing. Use Facebook Creator Studio for detailed watch time analytics.</div>
+                                        </div>
+                                    ) : (
+                                        <div style={{ width: '100%', height: 300 }}>
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <ComposedChart data={watchTimeChartData}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                                    <XAxis dataKey="time" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                                                    <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                                                    <Tooltip />
+                                                    <Bar dataKey="value" radius={[8, 8, 0, 0]} animationBegin={0} animationDuration={800}>
+                                                        {watchTimeChartData.map((entry, index) => (
+                                                            <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
+                                                        ))}
+                                                    </Bar>
+                                                </ComposedChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    )}
                                 </motion.div>
                             )}
 
@@ -1178,7 +1224,9 @@ export default function BestPerformingReel() {
                                                             ? 'Audience breakdown by demographics (Instagram audience — selected page)'
                                                             : ageGenderChartFromFacebook
                                                                 ? 'Audience breakdown by demographics (Facebook Page audience — selected page)'
-                                                                : 'Audience breakdown by demographics (Meta Ads Insights)'}
+                                                                : isFacebookSelected && reelPage && fbAudienceData?.age_breakdown?.length > 0
+                                                                    ? 'Audience breakdown by demographics (Instagram followers linked to this Facebook page)'
+                                                                    : 'Audience breakdown by demographics (Meta Ads Insights)'}
                                                     </small>
                                                 </div>
                                             </div>
@@ -1268,7 +1316,11 @@ export default function BestPerformingReel() {
                                         <div className="chart-legend-custom">
                                             <div className="fw-bold">Gender Distribution</div>
                                             {genderChartData.length > 0 && (
-                                                <small className="text-muted d-block">From Instagram audience (selected page)</small>
+                                                <small className="text-muted d-block">
+                                                    {isFacebookSelected && fbAudienceData?.gender_breakdown?.length > 0
+                                                        ? 'From Instagram followers (linked to this Facebook page)'
+                                                        : 'From Instagram audience (selected page)'}
+                                                </small>
                                             )}
                                         </div>
                                     </div>
@@ -1303,7 +1355,7 @@ export default function BestPerformingReel() {
                                             </ResponsiveContainer>
                                         </div>
                                     ) : (
-                                        <div className="text-muted small py-5 text-center">No Instagram gender data for this page. Select a page with Instagram linked to see gender distribution.</div>
+                                        <div className="text-muted small py-5 text-center">No gender data available for this page. Gender distribution requires an Instagram Business Account linked to the page.</div>
                                     )}
                                 </motion.div>
                             )}
@@ -1321,10 +1373,12 @@ export default function BestPerformingReel() {
                                     </div>
                                     <small className="text-muted d-block mb-3">
                                         {topTownsCitiesDisplay.length > 0
-                                            ? 'From Instagram audience (city-level)'
+                                            ? (effectiveCityBreakdown === fbCityBreakdown && fbCityBreakdown.length > 0
+                                                ? 'From Facebook Page audience (city-level)'
+                                                : 'From Instagram audience (city-level)')
                                             : topRegionsOrCountriesFromAds.list.length > 0
-                                                ? 'Country-level (city data not available for this page). From Meta Ads Insights.'
-                                                : 'Select a page with Instagram linked for city-level data.'}
+                                                ? topRegionsOrCountriesFromAds.subtitle || 'Country-level data.'
+                                                : 'No location data available for this page and period.'}
                                     </small>
                                     {igDemographicsError && topTownsCitiesDisplay.length === 0 && (
                                         <div className="alert alert-warning py-2 small mb-3" role="alert">
@@ -1386,7 +1440,7 @@ export default function BestPerformingReel() {
                                             ))}
                                         </div>
                                     ) : (
-                                        <div className="text-muted small py-3">No location data for this page/period. Select a page with Instagram linked for city-level data, or ensure Ads Insights has region/country data.</div>
+                                        <div className="text-muted small py-3">No location data available for this page and period. For city-level data, select a page with Instagram linked or use the Facebook audience metric.</div>
                                     )}
                                 </motion.div>
                             )}

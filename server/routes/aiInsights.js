@@ -32,7 +32,7 @@ async function callGeminiModel(model, prompt, { system = '', temperature = 0.6, 
   const { data } = await axios.post(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
     body,
-    { timeout: 30000 }
+    { timeout: 90000 }
   );
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error('Gemini returned no content');
@@ -305,8 +305,26 @@ router.post('/ask', async (req, res) => {
 
   const rawCtx = req.body?.context;
   let contextBlock = '';
+  let pinnedFacts = '';   // authoritative pre-computed numbers — Gemini must not re-derive these
+
   if (rawCtx && typeof rawCtx === 'object') {
     try {
+      // --- Pin key scalar facts so Gemini reads them directly instead of re-summing partial rows ---
+      const cs = rawCtx.campaignSummary;
+      if (cs) {
+        const fmt = (n) => (n != null && !Number.isNaN(Number(n))) ? Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 }) : null;
+        const lines = ['AUTHORITATIVE DASHBOARD TOTALS (use these numbers exactly — do not re-derive):'];
+        if (cs.dateRange?.from && cs.dateRange?.to) lines.push(`  Period: ${cs.dateRange.from} to ${cs.dateRange.to}`);
+        if (cs.totals?.spend   != null) lines.push(`  Total ad spend : ₹${fmt(cs.totals.spend)}`);
+        if (cs.totals?.leads   != null) lines.push(`  Total leads    : ${fmt(cs.totals.leads)}`);
+        if (cs.totals?.cpl     != null) lines.push(`  Cost per lead  : ₹${fmt(cs.totals.cpl)}`);
+        if (cs.totals?.ctr     != null) lines.push(`  CTR            : ${Number(cs.totals.ctr).toFixed(2)}%`);
+        if (cs.totals?.impressions != null) lines.push(`  Impressions    : ${fmt(cs.totals.impressions)}`);
+        if (cs.totals?.clicks  != null) lines.push(`  Clicks         : ${fmt(cs.totals.clicks)}`);
+        if (cs.totalAds        != null) lines.push(`  Total ads      : ${cs.totalAds}`);
+        if (lines.length > 1) pinnedFacts = lines.join('\n');
+      }
+
       const s = JSON.stringify(rawCtx);
       contextBlock = s.length > 14000 ? `${s.slice(0, 14000)}…` : s;
     } catch {
@@ -314,9 +332,11 @@ router.post('/ask', async (req, res) => {
     }
   }
 
-  const userContent = contextBlock
-    ? `Dashboard context (JSON):\n${contextBlock}\n\nUser question:\n${question}`
-    : question;
+  const userContent = [
+    pinnedFacts,
+    contextBlock ? `Full dashboard context (JSON):\n${contextBlock}` : '',
+    `User question:\n${question}`
+  ].filter(Boolean).join('\n\n');
 
   try {
     let text = await callGemini(userContent, { system: ASK_SYSTEM, temperature: 0.45, maxTokens: 2048 });

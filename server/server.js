@@ -78,6 +78,9 @@ app.use("/api/activity", activityRoutes);
 // Leads → Google Sheets real-time sync (webhook + scheduler + backfill)
 const leadsSyncRoutes = require("./routes/leadsSync");
 app.use("/api/leads-sync", leadsSyncRoutes);
+
+const aiFeaturesRoutes = require("./routes/aiFeatures");
+app.use("/api/ai/features", aiFeaturesRoutes);
 // Scheduler runs only on persistent hosts (Render/localhost).
 // On Vercel serverless each invocation is stateless so setInterval has no effect.
 if (!process.env.VERCEL) {

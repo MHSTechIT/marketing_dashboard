@@ -694,12 +694,23 @@ router.get("/insights", optionalAuthMiddleware, async (req, res) => {
     _log({ location: 'meta.jsx:GET/insights', message: 'db result', data: { source: 'db', rowCount: data.length }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H2' });
     // #endregion
 
-    // Auto-refresh from Meta if DB rows are missing video fields (data stored before video metrics were added to the API request)
+    // Per-account check: find accounts that returned 0 rows from DB or have stale rows
+    // (missing video fields). These need a live fetch even when other accounts have DB data.
+    // This prevents multi-account combined requests from silently returning partial data when
+    // some accounts are in DB and others are not.
     const dbLacksVideoFields = data.length > 0 && !Array.isArray(data[0].video_play_actions);
-    if (useLive || data.length === 0 || dbLacksVideoFields) {
+    const accountsWithNoDbRows = adAccountIds.filter((_, i) => dbResults[i].length === 0);
+    const needsLiveFetch = useLive || data.length === 0 || dbLacksVideoFields || accountsWithNoDbRows.length > 0;
+
+    if (needsLiveFetch) {
+      // For a full live refresh (explicit live=1, no DB data, or stale video fields), fetch all accounts.
+      // For per-account gaps, only fetch the missing accounts and merge with existing DB data.
+      const accountsToFetchLive = (useLive || data.length === 0 || dbLacksVideoFields)
+        ? adAccountIds
+        : accountsWithNoDbRows;
       try {
         const liveResults = await Promise.allSettled(
-          adAccountIds.map(async (adAccountId) => {
+          accountsToFetchLive.map(async (adAccountId) => {
             const liveData = await fetchInsightsFromMetaLive({
               accessToken: credentials.accessToken,
               adAccountId,
@@ -727,16 +738,26 @@ router.get("/insights", optionalAuthMiddleware, async (req, res) => {
           .flatMap((r) => r.value);
         const failedCount = liveResults.filter((r) => r.status === 'rejected').length;
         if (failedCount > 0) {
-          console.warn(`Insights live fetch: ${failedCount}/${adAccountIds.length} account(s) failed`);
+          console.warn(`Insights live fetch: ${failedCount}/${accountsToFetchLive.length} account(s) failed`);
         }
-        if (liveAggregate.length > 0) data = liveAggregate;
-        else if (useLive && data.length === 0 && failedCount === adAccountIds.length) {
-          const firstErr = liveResults.find((r) => r.status === 'rejected');
-          console.error("Insights live fetch error (all failed):", firstErr?.reason?.message || firstErr?.reason);
-          return res.status(500).json({
-            error: "Failed to fetch insights from Meta",
-            details: firstErr?.reason?.message || String(firstErr?.reason || 'All accounts failed'),
-          });
+        if (useLive || data.length === 0 || dbLacksVideoFields) {
+          // Full refresh: replace all DB data with live data if we got any
+          if (liveAggregate.length > 0) data = liveAggregate;
+          else if (useLive && data.length === 0 && failedCount === accountsToFetchLive.length) {
+            const firstErr = liveResults.find((r) => r.status === 'rejected');
+            console.error("Insights live fetch error (all failed):", firstErr?.reason?.message || firstErr?.reason);
+            return res.status(500).json({
+              error: "Failed to fetch insights from Meta",
+              details: firstErr?.reason?.message || String(firstErr?.reason || 'All accounts failed'),
+            });
+          }
+        } else {
+          // Per-account gap fill: merge live rows for missing accounts into existing DB data
+          if (liveAggregate.length > 0) {
+            const liveAccountSet = new Set(liveAggregate.map((r) => String(r.ad_account_id)));
+            const dbDataWithoutGaps = data.filter((r) => !liveAccountSet.has(String(r.ad_account_id)));
+            data = [...dbDataWithoutGaps, ...liveAggregate];
+          }
         }
       } catch (liveErr) {
         if (useLive && data.length === 0) {
@@ -2477,6 +2498,7 @@ router.get("/facebook-page-audience", optionalAuthMiddleware, async (req, res) =
     }
 
     // Fallback: if Page Insights had no age/gender data, try the linked Instagram Business Account
+    // Uses follower_demographics with breakdown=age,gender for per-gender-per-age granularity.
     if (age_breakdown.length === 0) {
       try {
         const pageUrl = `https://graph.facebook.com/${META_API_VERSION}/${pageId}`;
@@ -2500,20 +2522,40 @@ router.get("/facebook-page-audience", optionalAuthMiddleware, async (req, res) =
         }
 
         if (igAccountId) {
-          console.log(`[Facebook Page Audience] Trying IG demographics fallback for page ${pageId}, IG account ${igAccountId}`);
-          const igDemo = await fetchInstagramAudienceDemographics(igAccountId, accessToken, "this_month");
-          if (igDemo.age_breakdown?.length > 0) {
-            igDemo.age_breakdown.forEach(item => {
-              age_breakdown.push({ age: item.age, gender: "combined", value: item.value });
-            });
-          }
-          if (igDemo.gender_breakdown?.length > 0) {
-            igDemo.gender_breakdown.forEach(item => {
-              gender_breakdown.push({ gender: item.gender, value: item.value });
-            });
-          }
-          if (age_breakdown.length > 0) {
-            console.log(`[Facebook Page Audience] IG fallback success: ${age_breakdown.length} age items, ${gender_breakdown.length} gender items`);
+          console.log(`[Facebook Page Audience] Trying IG follower_demographics fallback for page ${pageId}, IG account ${igAccountId}`);
+          // follower_demographics requires instagram_manage_insights — always include the user token from env
+          const envUserToken = (process.env.META_ACCESS_TOKEN || '').trim();
+          if (envUserToken && !tokensToTry.includes(envUserToken)) tokensToTry.push(envUserToken);
+          let fetched = false;
+          for (const tok of tokensToTry) {
+            if (fetched) break;
+            try {
+              const igUrl = `https://graph.facebook.com/${META_API_VERSION}/${igAccountId}/insights`;
+              const { data: igData } = await axios.get(igUrl, {
+                params: { access_token: tok, metric: "follower_demographics", period: "lifetime",
+                  metric_type: "total_value", breakdown: "age,gender" },
+                timeout: 15000, validateStatus: () => true,
+              });
+              if (igData?.error) { console.warn("[Facebook Page Audience] follower_demographics error:", igData.error.message); continue; }
+              const results = igData?.data?.[0]?.total_value?.breakdowns?.[0]?.results || [];
+              if (results.length > 0) {
+                const genderTotals = { male: 0, female: 0 };
+                results.forEach((r) => {
+                  const [age, genderCode] = r.dimension_values || [];
+                  if (!age || !genderCode || genderCode === "U") return; // skip unknown gender
+                  const gender = genderCode === "F" ? "female" : "male";
+                  const value = parseInt(r.value, 10) || 0;
+                  if (value > 0) {
+                    age_breakdown.push({ age, gender, value });
+                    genderTotals[gender] = (genderTotals[gender] || 0) + value;
+                  }
+                });
+                if (genderTotals.male > 0) gender_breakdown.push({ gender: "male", value: genderTotals.male });
+                if (genderTotals.female > 0) gender_breakdown.push({ gender: "female", value: genderTotals.female });
+                console.log(`[Facebook Page Audience] IG follower_demographics success: ${age_breakdown.length} age/gender rows from IG ${igAccountId}`);
+                fetched = true;
+              }
+            } catch (_) {}
           }
         }
       } catch (igErr) {
@@ -3285,6 +3327,26 @@ router.get("/pages/:pageId/insights", optionalAuthMiddleware, async (req, res) =
       }
     };
 
+    // Fetch a metric with metric_type=total_value to get the period-level total (matches Meta Insights UI).
+    // Falls back to [] if unsupported.
+    const fetchTotalValue = async (metricsString) => {
+      try {
+        const params = {
+          access_token: accessToken,
+          metric: metricsString,
+          period: "day",
+          metric_type: "total_value",
+          since,
+          until,
+        };
+        const { data } = await axios.get(insightsUrl, { params });
+        return data.data || [];
+      } catch (err) {
+        console.warn("[Page Insights] metric_type=total_value not supported for:", metricsString, err?.response?.data?.error?.message || err.message);
+        return [];
+      }
+    };
+
     const mergeProcessedData = (base, next) => {
       const out = { ...base };
       if (next.total_reached > 0) {
@@ -3513,11 +3575,12 @@ router.get("/pages/:pageId/insights", optionalAuthMiddleware, async (req, res) =
       const insightsData = await fetchOneMetricSet(metric);
       processedData = processInsights(insightsData.length ? insightsData : [], periodLabel);
     } else {
-      const [reachViewsData, followsData, interactionsData, consumptionsData] = await Promise.all([
+      const [reachViewsData, followsData, interactionsData, consumptionsData, interactionsTotalData] = await Promise.all([
         fetchOneMetricSet("page_media_view,page_impressions_unique"),
         fetchOneMetricSet("page_daily_follows,page_daily_unfollows_unique,page_follows"),
         fetchOneMetricSet("page_post_engagements"),
         fetchOneMetricSet("page_consumptions"),
+        fetchTotalValue("page_post_engagements"),
       ]);
       processedData = processInsights([], periodLabel);
       if (reachViewsData.length) {
@@ -3531,6 +3594,18 @@ router.get("/pages/:pageId/insights", optionalAuthMiddleware, async (req, res) =
       }
       if (consumptionsData.length) {
         processedData = mergeProcessedData(processedData, processInsights(consumptionsData, periodLabel));
+      }
+      // Override total_interactions with the period-level total_value (matches Meta Insights "Content interactions").
+      // The daily sum from page_post_engagements overcounts because it sums all engagement each day across all posts.
+      if (interactionsTotalData.length) {
+        const engMetric = interactionsTotalData.find(m => m.name === "page_post_engagements");
+        if (engMetric) {
+          const tv = engMetric.total_value;
+          const tvNum = tv != null ? (typeof tv === "object" ? Number(tv.value) : Number(tv)) : NaN;
+          if (!isNaN(tvNum) && tvNum > 0) {
+            processedData.total_interactions = tvNum;
+          }
+        }
       }
       if ((processedData.total_follows === 0 && processedData.total_unfollows === 0) || !followsData.length) {
         const pageFollowsDaily = await fetchOneMetricSet("page_follows");
@@ -3835,22 +3910,28 @@ router.get("/facebook/media-insights", optionalAuthMiddleware, async (req, res) 
       return { likes: 0, comments: 0, shares: 0 };
     };
 
-    // --- Video views: try video_insights first, then direct views field ---
+    // --- Video views + avg watch time: try video_insights first, then direct views field ---
     const fetchVideoViewsById = async (videoId) => {
-      if (!videoId) return 0;
+      if (!videoId) return { views: 0, avg_time_ms: 0 };
 
-      // Attempt 1: video_insights endpoint (total_video_views)
+      // Attempt 1: video_insights endpoint — request views AND avg watch time in one call
       try {
         const vidInsRes = await axios.get(`${baseUrl}/${videoId}/video_insights`, {
-          params: { access_token: accessToken, metric: "total_video_views", period: "lifetime" },
+          params: { access_token: accessToken, metric: "total_video_views,total_video_avg_time_watched", period: "lifetime" },
           timeout: 12000,
           validateStatus: () => true,
         });
         if (vidInsRes.data?.error) {
           console.warn("[Facebook views] video_insights error for", videoId, ":", vidInsRes.data.error.message, "code:", vidInsRes.data.error.code);
         } else {
-          const val = extractInsightValue(vidInsRes.data?.data);
-          if (val > 0) return val;
+          const metricsArr = vidInsRes.data?.data || [];
+          let views = 0, avg_time_ms = 0;
+          for (const m of metricsArr) {
+            const val = extractInsightValue([m]);
+            if (m.name === "total_video_views") views = val;
+            else if (m.name === "total_video_avg_time_watched") avg_time_ms = val;
+          }
+          if (views > 0 || avg_time_ms > 0) return { views, avg_time_ms };
         }
       } catch (e) {
         console.warn("[Facebook views] video_insights exception for", videoId, ":", e.message);
@@ -3867,13 +3948,13 @@ router.get("/facebook/media-insights", optionalAuthMiddleware, async (req, res) 
           console.warn("[Facebook views] direct views error for", videoId, ":", directRes.data.error.message);
         } else {
           const v = parseInt(directRes.data?.views || 0, 10) || 0;
-          if (v > 0) return v;
+          if (v > 0) return { views: v, avg_time_ms: 0 };
         }
       } catch (e) {
         console.warn("[Facebook views] direct views exception for", videoId, ":", e.message);
       }
 
-      return 0;
+      return { views: 0, avg_time_ms: 0 };
     };
 
     // Process items in batches to avoid Meta rate limiting
@@ -3951,6 +4032,7 @@ router.get("/facebook/media-insights", optionalAuthMiddleware, async (req, res) 
     console.log("[Facebook media-insights] /videos returned", videosData.length, "videos");
 
     const videoViewsMap = {};
+    const videoWatchTimeMap = {};
     const videoDataMap = {};
     const postVideoIdMap = {};
 
@@ -3983,15 +4065,16 @@ router.get("/facebook/media-insights", optionalAuthMiddleware, async (req, res) 
       const viewResults = await processBatch(
         videosData,
         async (v) => {
-          const views = await fetchVideoViewsById(v.id);
-          console.log("[Facebook media-insights] video", v.id, "→ views:", views);
-          return { id: v.id, views, video: v };
+          const { views, avg_time_ms } = await fetchVideoViewsById(v.id);
+          console.log("[Facebook media-insights] video", v.id, "→ views:", views, "avg_time_ms:", avg_time_ms);
+          return { id: v.id, views, avg_time_ms, video: v };
         },
         5
       );
       for (const r of viewResults) {
         if (r.status === "fulfilled" && r.value) {
           videoViewsMap[r.value.id] = r.value.views;
+          videoWatchTimeMap[r.value.id] = r.value.avg_time_ms;
           videoDataMap[r.value.id] = r.value.video;
         }
       }
@@ -4043,6 +4126,7 @@ router.get("/facebook/media-insights", optionalAuthMiddleware, async (req, res) 
             engagement = await fetchPostEngagement(engagementId);
           }
 
+          const avgTimeSec = matchedVideoId ? ((videoWatchTimeMap[matchedVideoId] || 0) / 1000) : 0;
           return {
             media_id: p.id,
             permalink: p.permalink_url || null,
@@ -4053,6 +4137,7 @@ router.get("/facebook/media-insights", optionalAuthMiddleware, async (req, res) 
             thumbnail_url: p.full_picture || null,
             views: matchedViews,
             video_views: matchedViews,
+            video_avg_time_watched: avgTimeSec > 0 ? avgTimeSec : undefined,
             likes: engagement.likes,
             comments: engagement.comments,
             shares: engagement.shares,
@@ -4086,6 +4171,7 @@ router.get("/facebook/media-insights", optionalAuthMiddleware, async (req, res) 
           const views = videoViewsMap[vId] || 0;
           const engagement = await fetchPostEngagement(vId);
 
+          const avgTimeSec = (videoWatchTimeMap[vId] || 0) / 1000;
           return {
             media_id: vId,
             permalink: v.permalink_url || null,
@@ -4096,6 +4182,7 @@ router.get("/facebook/media-insights", optionalAuthMiddleware, async (req, res) 
             thumbnail_url: v.picture || null,
             views,
             video_views: views,
+            video_avg_time_watched: avgTimeSec > 0 ? avgTimeSec : undefined,
             likes: engagement.likes,
             comments: engagement.comments,
             shares: engagement.shares,
@@ -4265,6 +4352,7 @@ router.get("/instagram/media-insights", optionalAuthMiddleware, async (req, res)
   try {
     const { accountIds: accountIdsParam, pageIds: pageIdsParam, from, to, period, contentType } = req.query;
     const forceRefresh = req.query.refresh === "1" || req.query.refresh === "true";
+    const limitParam = req.query.limit ? Math.min(Math.max(1, parseInt(req.query.limit, 10) || 100), 100) : undefined;
 
     let accountIds = [];
     if (accountIdsParam) {
@@ -4286,6 +4374,7 @@ router.get("/instagram/media-insights", optionalAuthMiddleware, async (req, res)
       to: to || undefined,
       period: period || undefined,
       contentType: contentType && ["all", "posts", "stories", "reels"].includes(String(contentType).toLowerCase()) ? String(contentType).toLowerCase() : undefined,
+      limit: limitParam,
     };
     const cacheKey = insightsCache.buildMediaInsightsKey(cacheOpts);
     const cached = forceRefresh ? null : insightsCache.get(cacheKey);
@@ -4297,7 +4386,7 @@ router.get("/instagram/media-insights", optionalAuthMiddleware, async (req, res)
     // Meta rate-limit ((#4) Application request limit reached) or slowness can make it
     // hang and cause the browser to see ERR_CONNECTION_RESET. Race the live fetch against
     // a timeout; on timeout, serve the last-known (stale) cached value so the page still renders.
-    const MEDIA_INSIGHTS_TIMEOUT_MS = 25000;
+    const MEDIA_INSIGHTS_TIMEOUT_MS = 45000;
     let timedOut = false;
     const fetchPromise = fetchInstagramMediaInsights({
       accountIds: cacheOpts.accountIds,
@@ -4307,6 +4396,7 @@ router.get("/instagram/media-insights", optionalAuthMiddleware, async (req, res)
       to: cacheOpts.to,
       period: cacheOpts.period,
       contentType: cacheOpts.contentType,
+      limit: limitParam,
     }).then((r) => {
       // If it completes after we already timed out, populate the cache for next time.
       if (timedOut && r != null) {
