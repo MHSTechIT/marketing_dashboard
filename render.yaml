@@ -7,6 +7,12 @@
     envVars:
       - key: NODE_ENV
         value: production
+      # Explicitly force the background sync schedulers ON for the deployed server.
+      # (NODE_ENV=production already enables them; this is a belt-and-suspenders
+      # guard. Local/dev machines leave this unset so they never push to the live
+      # Google Sheet.)
+      - key: RUN_SCHEDULERS
+        value: "true"
       - key: PORT
         value: 4000
       # --- JWT ---

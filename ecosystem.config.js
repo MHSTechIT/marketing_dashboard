@@ -55,6 +55,10 @@ module.exports = {
         // Belt-and-suspenders: force the schedulers on even if a future deploy
         // imports the app instead of running it directly.
         ENABLE_SCHEDULERS: 'true',
+        // Explicitly opt this always-on server into the background sync schedulers.
+        // Local/dev machines leave RUN_SCHEDULERS unset, so `node server.js` there
+        // never pushes leads to the live Google Sheet.
+        RUN_SCHEDULERS: 'true',
       },
 
       // Timestamped logs under <repo>/logs

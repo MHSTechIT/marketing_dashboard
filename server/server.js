@@ -1306,10 +1306,37 @@ function startSchedulers() {
   try { dwLeadsGSheetSyncIntervalId = startDwLeadsGSheetSyncScheduler(); } catch (e) { console.error('Error starting DW leads Google Sheet sync:', e.message); }
 }
 
+/**
+ * Background schedulers (Meta → Google Sheet, leads → DB, insights, token refresh…)
+ * must run ONLY on the always-on production server — NEVER on a developer's local
+ * machine. A local `node server.js` shares the same META_ACCESS_TOKEN, Google
+ * service-account key and live SPREADSHEET_ID, so if the schedulers ran locally
+ * they would double-push leads into the SAME production Google Sheet and double
+ * the Meta API load (this is exactly the "local start keeps syncing to the sheet"
+ * problem).
+ *
+ * Enabled when NODE_ENV=production (Render + PM2 both set this) or when a developer
+ * explicitly opts in with RUN_SCHEDULERS=true. Force-off with DISABLE_SCHEDULERS=true.
+ */
+function schedulersEnabled() {
+  if (String(process.env.DISABLE_SCHEDULERS).toLowerCase() === 'true') return false;
+  if (String(process.env.RUN_SCHEDULERS).toLowerCase() === 'true') return true;
+  return process.env.NODE_ENV === 'production';
+}
+
 function startServer(retries = 3) {
   const server = app.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
-    startSchedulers();
+    if (schedulersEnabled()) {
+      startSchedulers();
+    } else {
+      console.log(
+        '[Schedulers] Skipped on this host — background syncs (Meta → Google Sheet, ' +
+        'leads → DB, insights, token refresh) run only on the production server. ' +
+        'This is a local/dev run, so nothing will be pushed to the live Google Sheet. ' +
+        'Set RUN_SCHEDULERS=true in server/.env if you deliberately want to run them here.'
+      );
+    }
   });
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE' && retries > 0) {
@@ -1335,11 +1362,13 @@ if (require.main === module) {
   // Run directly (e.g. `node server.js`, `npm start`, or PM2): bind the port and
   // start the schedulers — this is the always-on / persistent-host path.
   startServer();
-} else if (String(process.env.ENABLE_SCHEDULERS).toLowerCase() === 'true' && !process.env.VERCEL) {
+} else if (String(process.env.ENABLE_SCHEDULERS).toLowerCase() === 'true' && !process.env.VERCEL && schedulersEnabled()) {
   // App was imported by a custom server/process wrapper on a PERSISTENT host
   // (not Vercel serverless). Start the background schedulers without binding a
   // second HTTP port, so lead sync still runs continuously. Vercel is excluded
   // because setInterval cannot survive between stateless function invocations.
+  // schedulersEnabled() adds the same local-machine guard as the direct-run path
+  // so DISABLE_SCHEDULERS=true is always respected.
   console.log('[Schedulers] ENABLE_SCHEDULERS=true and not Vercel — starting schedulers in imported mode.');
   startSchedulers();
 }
