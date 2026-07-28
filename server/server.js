@@ -24,6 +24,9 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const { supabase, verifyTableExists } = require('./supabase');
+// Resolve the leads table/columns the same way the write path does, so these
+// endpoints can never drift onto a different physical table again.
+const { leadsTableName, leadsCol, resolveLeadsDbShape } = require('./repositories/leadsRepository');
 const { signToken, hashPassword, comparePassword, authMiddleware } = require('./auth');
 
 const app = express();
@@ -81,11 +84,11 @@ app.use("/api/leads-sync", leadsSyncRoutes);
 
 const aiFeaturesRoutes = require("./routes/aiFeatures");
 app.use("/api/ai/features", aiFeaturesRoutes);
-// Scheduler runs only on persistent hosts (Render/localhost).
-// On Vercel serverless each invocation is stateless so setInterval has no effect.
-if (!process.env.VERCEL) {
-  leadsSyncRoutes.startScheduler();
-}
+// NOTE: the DW-live-data sheet scheduler used to start here behind only
+// `!process.env.VERCEL`, which meant a developer running the server locally
+// pushed straight to the LIVE Google Sheet. It now starts from
+// startSchedulers() so it obeys the same schedulersEnabled() gate as every
+// other background job (production sets NODE_ENV=production + RUN_SCHEDULERS).
 
 app.get("/", (req, res) => {
   res.send("Backend is running...");
@@ -744,32 +747,33 @@ app.get('/api/ads', async (req, res) => {
 
     // Include lead details if requested
     if (includeLeads) {
+      // Same fix as /api/leads below: resolve the table/columns instead of
+      // hardcoding the mixed-case legacy names.
+      const shape = resolveLeadsDbShape ? await resolveLeadsDbShape() : 'snake';
+      const tbl = leadsTableName(shape);
+      const C = leadsCol(shape);
+
       for (const a of ads) {
-        // Table name: 'Leads' (capitalized) - matches public.Leads
         const { data: leadRows, error: leadsError } = await supabase
-          .from('Leads')
-          .select('Id, Name, Phone, TimeUtc, DateChar, Campaign')
-          .eq('DateChar', a.date)
-          .eq('Campaign', a.campaign)
-          .order('TimeUtc', { ascending: false });
+          .from(tbl)
+          .select([C.id, C.name, C.phone, C.time, C.date, C.campaign].join(', '))
+          .eq(C.date, a.date)
+          .eq(C.campaign, a.campaign)
+          .order(C.time, { ascending: false });
 
         if (!leadsError && leadRows) {
-          // Transform leads to match expected format
-          // Supabase returns mixed case column names
-          a.lead_details = leadRows.map(l => ({
-            Id: l.Id,
-            id: l.Id,
-            Name: l.Name,
-            name: l.Name,
-            Phone: l.Phone,
-            phone: l.Phone,
-            Time: l.TimeUtc,
-            TimeUtc: l.TimeUtc,
-            Date: l.DateChar,
-            DateChar: l.DateChar,
-            Campaign: l.Campaign,
-            campaign: l.Campaign
-          }));
+          a.lead_details = leadRows.map(l => {
+            const id = l[C.id], name = l[C.name], phone = l[C.phone];
+            const time = l[C.time], date = l[C.date], campaign = l[C.campaign];
+            return {
+              Id: id, id,
+              Name: name, name,
+              Phone: phone, phone,
+              Time: time, TimeUtc: time,
+              Date: date, DateChar: date,
+              Campaign: campaign, campaign,
+            };
+          });
         }
       }
     }
@@ -793,19 +797,28 @@ app.get('/api/leads', async (req, res) => {
     const campaign = req.query.campaign || null;
     const offset = (page - 1) * perPage;
 
-    // Build query
-    // Table name: 'Leads' (capitalized) - matches public.Leads
-    let countQuery = supabase.from('Leads').select('*', { count: 'exact', head: true });
+    // Resolve the leads table the same way the WRITE path does. This used to
+    // hardcode 'Leads' (mixed case), which under the case-sensitive pgClient
+    // shim is a physically different table from the lowercase `leads` that
+    // every sync job writes to — so this endpoint served a legacy snapshot
+    // frozen since 2026-01-20 while the real table kept growing.
+    const shape = resolveLeadsDbShape ? await resolveLeadsDbShape() : 'snake';
+    const tbl = leadsTableName(shape);
+    const C = leadsCol(shape);
+
+    let countQuery = supabase.from(tbl).select('*', { count: 'exact', head: true });
     let rowsQuery = supabase
-      .from('Leads')
-      .select('Id, Name, Phone, TimeUtc, DateChar, Campaign')
-      .order('TimeUtc', { ascending: false })
+      .from(tbl)
+      .select([C.id, C.name, C.phone, C.time, C.date, C.campaign].join(', '))
+      // .order(C.id) breaks ties so range() paging stays stable.
+      .order(C.time, { ascending: false })
+      .order(C.id, { ascending: false })
       .range(offset, offset + perPage - 1);
 
     // Apply campaign filter if provided
     if (campaign) {
-      countQuery = countQuery.eq('Campaign', campaign);
-      rowsQuery = rowsQuery.eq('Campaign', campaign);
+      countQuery = countQuery.eq(C.campaign, campaign);
+      rowsQuery = rowsQuery.eq(C.campaign, campaign);
     }
 
     // Execute queries
@@ -826,22 +839,21 @@ app.get('/api/leads', async (req, res) => {
 
     const total = countResult.count || 0;
 
-    // Transform rows to match expected format (camelCase for compatibility)
-    // Supabase returns mixed case column names
-    const rows = (rowsResult.data || []).map(r => ({
-      Id: r.Id,
-      id: r.Id,
-      Name: r.Name,
-      name: r.Name,
-      Phone: r.Phone,
-      phone: r.Phone,
-      Time: r.TimeUtc,
-      TimeUtc: r.TimeUtc,
-      Date: r.DateChar,
-      DateChar: r.DateChar,
-      Campaign: r.Campaign,
-      campaign: r.Campaign
-    }));
+    // Transform to the dual-case shape existing consumers expect. Source column
+    // names come from C so this works against either DB shape — reading r.Id
+    // directly would yield undefined now that the snake-case table is used.
+    const rows = (rowsResult.data || []).map(r => {
+      const id = r[C.id], name = r[C.name], phone = r[C.phone];
+      const time = r[C.time], date = r[C.date], campaign = r[C.campaign];
+      return {
+        Id: id, id,
+        Name: name, name,
+        Phone: phone, phone,
+        Time: time, TimeUtc: time,
+        Date: date, DateChar: date,
+        Campaign: campaign, campaign,
+      };
+    });
 
     res.json({ total, page, perPage, rows });
   } catch (err) {
@@ -1304,6 +1316,11 @@ function startSchedulers() {
   try { storySnapshotsIntervalId = startStorySnapshotsScheduler(); } catch (e) { console.error('Error starting story snapshots scheduler:', e.message); }
   try { autoDeleteLeadsIntervalId = startAutoDeleteScheduler(); } catch (e) { console.error('Error starting auto-delete leads scheduler:', e.message); }
   try { dwLeadsGSheetSyncIntervalId = startDwLeadsGSheetSyncScheduler(); } catch (e) { console.error('Error starting DW leads Google Sheet sync:', e.message); }
+  // DW-live data sheet sync (routes/leadsSync.js). Started here rather than at
+  // route-registration time so it cannot push to the live sheet from a local run.
+  try { leadsSyncRoutes.startScheduler(); } catch (e) { console.error('Error starting DW-live sheet scheduler:', e.message); }
+  // Cross-system drift checker: Meta vs `leads` table vs DW-live data sheet.
+  try { leadsSyncRoutes.startReconcileScheduler(); } catch (e) { console.error('Error starting leads reconcile drift checker:', e.message); }
 }
 
 /**

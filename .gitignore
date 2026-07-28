@@ -24,6 +24,10 @@ yarn-error.log*
 lerna-debug.log*
 server/server.log
 *.log
+# Server/client start output. These were tracked despite the *.log rule above,
+# which does not match .err/.out, so every run showed up as a working-tree change.
+*.err
+*.out
 
 # OS files
 .DS_Store

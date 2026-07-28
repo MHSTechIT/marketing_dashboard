@@ -313,13 +313,59 @@ async function runDwLeadsSync() {
   _running = false;
 }
 
+// ── Preflight ─────────────────────────────────────────────────────────────────
+/**
+ * Verify the target tab actually exists before scheduling anything.
+ *
+ * `appendRows` uses spreadsheets.values.append, which does NOT create a missing
+ * tab — it returns a 400. SHEET_NAME ('DW LEADS FROM MKT SW') is no longer a tab
+ * in this spreadsheet: it was renamed (the current 'Over All Leads' tab holds
+ * this job's exact 9 columns with a new leading 'Ad Account Name' column). So
+ * every run since the rename has re-scanned Meta and then thrown on append —
+ * every 2 minutes, indefinitely, with only a generic error line.
+ *
+ * Rather than guess at the new layout and write to a 51k-row sheet unattended,
+ * refuse to schedule and say exactly what is wrong.
+ */
+async function preflightSheetTab() {
+  const { getSheetsClient } = require('../services/googleSheetsService');
+  const sheets = await getSheetsClient();
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
+  const tabs = (meta.data.sheets || []).map(s => s.properties.title);
+  if (tabs.includes(SHEET_NAME)) return { ok: true, tabs };
+  return { ok: false, tabs };
+}
+
 // ── Scheduler ─────────────────────────────────────────────────────────────────
 function startDwLeadsGSheetSyncScheduler() {
-  console.log(`[DWSync] Scheduler started — every ${SYNC_INTERVAL_MS / 60000} min.`);
-  runDwLeadsSync().catch(e => console.error('[DWSync] Initial run error:', e.message));
-  return setInterval(() => {
-    runDwLeadsSync().catch(e => console.error('[DWSync] Interval run error:', e.message));
-  }, SYNC_INTERVAL_MS);
+  if (String(process.env.DW_SHEET_SYNC_ENABLED).toLowerCase() === 'false') {
+    console.log('[DWSync] Disabled via DW_SHEET_SYNC_ENABLED=false — not scheduling.');
+    return null;
+  }
+
+  let intervalId = null;
+  preflightSheetTab()
+    .then(({ ok, tabs }) => {
+      if (!ok) {
+        console.error(
+          `[DWSync] NOT STARTED — target tab "${SHEET_NAME}" does not exist in ` +
+          `spreadsheet ${SPREADSHEET_ID}. Existing tabs: ${tabs.map(t => `"${t}"`).join(', ')}. ` +
+          `This job has been failing on every append since the tab was renamed. ` +
+          `Fix SHEET_NAME in server/jobs/dwLeadsGSheetSync.js (note: "Over All Leads" ` +
+          `carries an extra leading "Ad Account Name" column this job does not write), ` +
+          `or set DW_SHEET_SYNC_ENABLED=false to silence this.`
+        );
+        return;
+      }
+      console.log(`[DWSync] Scheduler started — every ${SYNC_INTERVAL_MS / 60000} min.`);
+      runDwLeadsSync().catch(e => console.error('[DWSync] Initial run error:', e.message));
+      intervalId = setInterval(() => {
+        runDwLeadsSync().catch(e => console.error('[DWSync] Interval run error:', e.message));
+      }, SYNC_INTERVAL_MS);
+    })
+    .catch(e => console.error('[DWSync] Preflight failed — not scheduling:', e.message));
+
+  return { get id() { return intervalId; } };
 }
 
 module.exports = { startDwLeadsGSheetSyncScheduler, runDwLeadsSync };

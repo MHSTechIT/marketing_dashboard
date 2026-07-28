@@ -284,6 +284,20 @@ async function fetchLeadsFromMeta(pageId, startDate, endDate) {
   const endTimestamp = Math.floor(endDate.getTime() / 1000);
 
   let allLeads = [];
+  // Meta's cursor pagination can hand back the same lead twice (overlapping
+  // `after` cursors), and the same form can appear more than once in the batch
+  // response. A repeated lead_id inside ONE upsert batch makes Postgres raise
+  // "ON CONFLICT DO UPDATE command cannot affect row a second time" (SQLSTATE
+  // 21000) — which matches neither retry branch in leadsRepository and takes the
+  // whole page's leads down with it. Dedupe on the way in.
+  const seenLeadIds = new Set();
+  let duplicatesSkipped = 0;
+  // Forms we could NOT read this run. Previously a failed form was logged as a
+  // warning, marked done, and the run still reported success — so the caller
+  // advanced its checkpoint past a window whose leads were never fetched, and
+  // they were only ever recovered if the 3-day reconcile happened to still cover
+  // them. Collected here and surfaced on the returned array (see below).
+  const failedForms = [];
 
   try {
     const maxPagesPerForm = 50;
@@ -407,10 +421,26 @@ async function fetchLeadsFromMeta(pageId, startDate, endDate) {
         const item = batchResponses[i];
         const code = item?.code;
         let bodyJson = null;
+        let bodyParseError = null;
         try {
           bodyJson = item?.body ? JSON.parse(item.body) : null;
         } catch (e) {
           bodyJson = null;
+          bodyParseError = e;
+        }
+
+        // A body we could not parse used to fall straight through: graphErr was
+        // undefined and code was 200, so leadsData became [] and the form was
+        // recorded as "no leads" with no log line at all. Treat it as a failure.
+        if (bodyParseError || (code === 200 && item?.body && bodyJson === null)) {
+          console.error(
+            `[LeadsSync] Form ${formId}: unreadable batch response body ` +
+            `(${bodyParseError ? bodyParseError.message : 'parsed to null'}). ` +
+            `Treating as FAILED so the checkpoint does not advance past it.`
+          );
+          failedForms.push({ formId, reason: 'unparseable-body' });
+          state.done = true;
+          continue;
         }
 
         // Handle per-item errors
@@ -432,7 +462,11 @@ async function fetchLeadsFromMeta(pageId, startDate, endDate) {
             continue;
           }
 
-          console.warn(`[LeadsSync] Skipping form ${formId} page due to error:`, errMsg);
+          console.error(
+            `[LeadsSync] Form ${formId} FAILED (code ${errCode ?? code}): ${errMsg}. ` +
+            `Marking the run unsuccessful so the checkpoint holds and this window is retried.`
+          );
+          failedForms.push({ formId, reason: errMsg });
           state.done = true;
           continue;
         }
@@ -642,6 +676,13 @@ async function fetchLeadsFromMeta(pageId, startDate, endDate) {
             sugar_poll: sugarPoll,
           };
 
+          const dedupKey = mappedLead.lead_id != null ? String(mappedLead.lead_id) : null;
+          if (dedupKey && seenLeadIds.has(dedupKey)) {
+            duplicatesSkipped++;
+            continue;
+          }
+          if (dedupKey) seenLeadIds.add(dedupKey);
+
           allLeads.push(mappedLead);
           leadsProcessed++;
           stats.processedSuccessfully++;
@@ -670,7 +711,27 @@ async function fetchLeadsFromMeta(pageId, startDate, endDate) {
     // Note: formsWithoutLeads is already tracked in the loop above
 
     console.timeEnd('[LeadsSync] Fetch leads (batched)');
-    
+
+    if (duplicatesSkipped > 0) {
+      console.log(
+        `[LeadsSync] Skipped ${duplicatesSkipped} duplicate lead_id(s) returned by Meta ` +
+        `(would have aborted the upsert batch with SQLSTATE 21000).`
+      );
+    }
+
+    // Surfaced as a property so the array contract (and sync-last-week.js, which
+    // imports this function) is unchanged. Callers that care check it; callers
+    // that don't are unaffected.
+    Object.defineProperty(allLeads, 'failedForms', {
+      value: failedForms, enumerable: false, writable: true, configurable: true,
+    });
+    if (failedForms.length) {
+      console.error(
+        `[LeadsSync] page=${pageId}: ${failedForms.length} form(s) failed this run — ` +
+        failedForms.map(f => f.formId).join(', ')
+      );
+    }
+
     return allLeads;
   } catch (error) {
     console.error('[LeadsSync] Error fetching leads from Meta API:', error.response?.data || error.message);
@@ -696,13 +757,18 @@ function getPageIds() {
 async function syncPageLeads(pageId, startDate, endDate) {
   console.log(`[LeadsSync] Syncing page ${pageId}: ${startDate.toISOString()} → ${endDate.toISOString()}`);
   const leads = await fetchLeadsFromMeta(pageId, startDate, endDate);
+  const failedForms = leads.failedForms || [];
+
   if (leads.length === 0) {
     console.log(`[LeadsSync] page=${pageId} no new leads in range`);
-    return true;
+    // "No leads" because every form errored is NOT success.
+    return failedForms.length === 0;
   }
+  // Still save what we did fetch — saveLeads is an idempotent upsert, so the
+  // retry that follows a failure re-writes these harmlessly.
   await saveLeads(leads);
   console.log(`[LeadsSync] page=${pageId} saved ${leads.length} lead(s)`);
-  return true;
+  return failedForms.length === 0;
 }
 
 /**
@@ -759,7 +825,14 @@ async function syncLeads() {
     let allSucceeded = true;
     for (const pageId of pageIds) {
       try {
-        await syncPageLeads(pageId, startDate, endDate);
+        // syncPageLeads returns false when individual FORMS failed inside an
+        // otherwise-successful page fetch. Without honouring that return value
+        // the cursor advanced past windows whose leads were never fetched.
+        const ok = await syncPageLeads(pageId, startDate, endDate);
+        if (!ok) {
+          console.warn(`[LeadsSync] page ${pageId} completed with form-level failures.`);
+          allSucceeded = false;
+        }
       } catch (err) {
         console.error(`[LeadsSync] Error syncing page ${pageId}:`, err.message || err);
         allSucceeded = false;
@@ -829,17 +902,29 @@ async function reconcileRecentLeads(days) {
   const start = new Date(end.getTime() - reconcileDays * 24 * 60 * 60 * 1000);
   console.log(`[LeadsReconcile] Trailing-window reconcile ${start.toISOString()} → ${end.toISOString()} (${reconcileDays}d, ${pageIds.length} page(s))`);
   let fetched = 0;
+  // This used to return { ok: true } no matter how many pages threw, so a
+  // reconcile that healed nothing looked identical to one that healed everything.
+  const failures = [];
   for (const pageId of pageIds) {
     try {
       const leads = await fetchLeadsFromMeta(pageId, start, end);
       if (leads.length) await saveLeads(leads);
       fetched += leads.length;
+      for (const f of leads.failedForms || []) failures.push({ pageId, ...f });
     } catch (e) {
-      console.error(`[LeadsReconcile] page ${pageId} error:`, e.response?.data?.error?.message || e.message);
+      const msg = e.response?.data?.error?.message || e.message;
+      console.error(`[LeadsReconcile] page ${pageId} error:`, msg);
+      failures.push({ pageId, reason: msg });
     }
   }
+  if (failures.length) {
+    console.error(
+      `[LeadsReconcile] Completed with ${failures.length} failure(s) — the trailing ` +
+      `window was NOT fully verified: ` + failures.map(f => f.formId || f.pageId).join(', ')
+    );
+  }
   console.log(`[LeadsReconcile] Done — ${fetched} lead(s) upserted across ${reconcileDays}d.`);
-  return { ok: true, fetched, days: reconcileDays };
+  return { ok: failures.length === 0, fetched, days: reconcileDays, failures };
 }
 
 /**

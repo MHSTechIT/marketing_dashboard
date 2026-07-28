@@ -368,6 +368,39 @@ function leadRowInDateRange(row, dateFrom, dateTo) {
   return false;
 }
 
+// Page size / ceiling for the paginated range reads below. Mirrors the idiom in
+// routes/conversions.js:147-164.
+const LEADS_PAGE_SIZE = 1000;
+const LEADS_MAX_ROWS = 200000;
+
+/**
+ * Run a filtered query to completion, `LEADS_PAGE_SIZE` rows at a time.
+ *
+ * The three range queries in fetchLeadsRawForShape used to carry a bare
+ * `.limit(10000)` with no pagination, which SILENTLY truncated any window
+ * holding more than 10k leads — a 30-day range is ~33k, a 90-day range ~81k —
+ * so the dashboard reported a number far below the real count with no warning
+ * and no error. Paginating is what makes the app's totals match the database.
+ *
+ * Returns the same `{ data, error }` shape the callers already destructure.
+ */
+async function fetchAllPaged(buildQuery, label) {
+  const rows = [];
+  for (let offset = 0; offset < LEADS_MAX_ROWS; offset += LEADS_PAGE_SIZE) {
+    const res = await buildQuery().range(offset, offset + LEADS_PAGE_SIZE - 1);
+    if (res.error) return { data: rows, error: res.error };
+    const batch = res.data || [];
+    rows.push(...batch);
+    if (batch.length < LEADS_PAGE_SIZE) return { data: rows, error: null };
+  }
+  // Never silently truncate: if we somehow exhaust the ceiling, say so loudly.
+  console.warn(
+    `[LeadsRepository] ${label}: reached the ${LEADS_MAX_ROWS}-row ceiling — ` +
+    `result may be incomplete. Narrow the date range or raise LEADS_MAX_ROWS.`
+  );
+  return { data: rows, error: null };
+}
+
 /**
  * Fetch normalized raw lead rows for one DB shape (merge DateChar + time + created_time paths).
  */
@@ -396,22 +429,29 @@ async function fetchLeadsRawForShape(shape, campaignIdList, adIdList, formIdList
     // the IST-aware post-filter below then trims to the exact range.
     const dateFromISO = new Date(`${dateFrom}T00:00:00+05:30`).toISOString();
     const dateToISO = new Date(`${dateTo}T23:59:59.999+05:30`).toISOString();
-    const qChar = buildFiltered()
-      .gte(C.date, dateFrom)
-      .lte(C.date, dateTo)
-      .order(C.date, { ascending: false })
-      .limit(10000);
-    const qUtc = buildFiltered()
-      .gte(C.time, dateFromISO)
-      .lte(C.time, dateToISO)
-      .order(C.time, { ascending: false })
-      .limit(10000);
-    const qCreated = buildFiltered()
-      .gte('created_time', dateFromISO)
-      .lte('created_time', dateToISO)
-      .order('created_time', { ascending: false })
-      .limit(10000);
-    const [rChar, rUtc, rCr] = await Promise.all([qChar, qUtc, qCreated]);
+    // NOTE the `.order(C.id)` tiebreaker on every query. OFFSET/LIMIT paging is
+    // only stable under a TOTAL ordering — date_char, time_utc and created_time
+    // all have heavy ties (many leads share a day, some share a timestamp), and
+    // Postgres is free to order tied rows differently between the page-1 and
+    // page-2 queries, which silently skips and duplicates rows across the
+    // boundary. The primary key breaks every tie.
+    const [rChar, rUtc, rCr] = await Promise.all([
+      fetchAllPaged(
+        () => buildFiltered().gte(C.date, dateFrom).lte(C.date, dateTo)
+          .order(C.date, { ascending: false }).order(C.id, { ascending: false }),
+        `${shape} ${C.date} range ${dateFrom}…${dateTo}`
+      ),
+      fetchAllPaged(
+        () => buildFiltered().gte(C.time, dateFromISO).lte(C.time, dateToISO)
+          .order(C.time, { ascending: false }).order(C.id, { ascending: false }),
+        `${shape} ${C.time} range ${dateFrom}…${dateTo}`
+      ),
+      fetchAllPaged(
+        () => buildFiltered().gte('created_time', dateFromISO).lte('created_time', dateToISO)
+          .order('created_time', { ascending: false }).order(C.id, { ascending: false }),
+        `${shape} created_time range ${dateFrom}…${dateTo}`
+      ),
+    ]);
     if (rChar.error) {
       const msg = rChar.error.message || String(rChar.error);
       if (/column|does not exist|schema cache/i.test(msg)) {
@@ -478,7 +518,11 @@ async function fetchLeadsRawForShape(shape, campaignIdList, adIdList, formIdList
       formIdList.length === 0 &&
       pageIdList.length === 0;
     if (data.length === 0 && noIdFilters) {
-      const rWide = await supabase.from(tbl).select('*').order(C.time, { ascending: false }).limit(15000);
+      const rWide = await fetchAllPaged(
+        () => supabase.from(tbl).select('*')
+          .order(C.time, { ascending: false }).order(C.id, { ascending: false }),
+        `${shape} fallback wide fetch`
+      );
       if (rWide.error) {
         console.error('[LeadsRepository] Fallback wide fetch error:', rWide.error);
       } else {
@@ -684,4 +728,10 @@ module.exports = {
   getLeadsByDateRange,
   upsertLead,
   getDuplicateRateByCampaign,
+  // Exported so callers outside this module (e.g. the /api/leads endpoint in
+  // server.js) resolve the leads table the SAME way the write path does,
+  // instead of hardcoding a name and drifting onto a different table.
+  leadsTableName,
+  leadsCol,
+  resolveLeadsDbShape,
 };
