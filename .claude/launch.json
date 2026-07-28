@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "server",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd server && npm start"],
+      "port": 4000,
+      "autoPort": false
+    },
+    {
+      "name": "client",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd client && set BROWSER=none && npm start"],
+      "port": 3000
+    }
+  ]
+}
